@@ -8,7 +8,7 @@ namespace actuator_manager
     {
         servo_valve::initialize();
     }
-    void open_valve_by_percent(unsigned int opening_percentage)
+    void open_valve_by_percent(float opening_percentage)
     {
         unsigned int degree = (int)(constant::VALVE_PERCENT_TO_DEGREE_GRADIENT * opening_percentage + constant::VALVE_PERCENT_TO_DEGREE_OFFSET);
         servo_valve::open_by_degree(degree);
