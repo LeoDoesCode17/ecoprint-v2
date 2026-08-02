@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include "actuator_manager.h"
 
 namespace
 {
@@ -62,6 +63,30 @@ namespace
 
         return true;
     }
+    static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
+    {
+        StaticJsonDocument<128> doc;
+        DeserializationError err = deserializeJson(doc, payload, length);
+        if (err)
+        {
+            Serial.printf("[MQTT] JSON parse failed: %s\n", err.c_str());
+            return;
+        }
+        if (strcmp(topic, constant::SUBSCRIBE_ACTUATOR_TOPIC) == 0)
+        {
+            const char *actuator = doc["actuator"];
+            const int value = doc["value"];
+            if (!actuator)
+            {
+                Serial.println("[MQTT] Missing required fields");
+                return;
+            }
+            if (strcmp(actuator, "servo_valve") == 0) {
+                actuator_manager::open_valve_by_percent(value);
+                Serial.printf("[ACTUATOR] Opening servo valve by %d%\n", value);
+            }
+        }
+    }
 }
 namespace network_manager
 {
@@ -70,6 +95,7 @@ namespace network_manager
         wifi::connect_or_reconnect();
         mqtt::initialize();
         init_time();
+        mqtt::set_callback(on_mqtt_message);
     }
     void conect_or_reconnect()
     {
@@ -129,5 +155,8 @@ namespace network_manager
         {
             Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_SENSORS_TOPIC);
         }
+    }
+    void mqtt_loop() {
+        mqtt::loop();
     }
 }
