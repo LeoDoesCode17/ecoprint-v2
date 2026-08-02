@@ -23,6 +23,7 @@ void loop()
 {
   if (millis() - last_main_loop >= constant::MAIN_LOOP_INTERVAL_MS)
   {
+    network_manager::mqtt_loop();
     network_manager::conect_or_reconnect();
 
     if (millis() - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
