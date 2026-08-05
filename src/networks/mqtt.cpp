@@ -50,12 +50,12 @@ namespace mqtt
         // 4. Configure MQTT server with the resolved IP
         if (brokerIp != INADDR_NONE)
         {
-            mqtt_client.setServer(brokerIp, constant::MQTT_PORT);
+            mqtt_client.setServer(brokerIp, constant::RASPI_MQTT_PORT);
         }
         else
         {
             // if not resolved, fallback to online hive IP or hostname
-            mqtt_client.setServer("broker.hivemq.com", 1883);
+            mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
         }
     }
     void connect_or_reconnect()
@@ -74,6 +74,7 @@ namespace mqtt
                 mqtt_client.subscribe(constant::SUBSCRIBE_TOPIC);
                 mqtt_client.subscribe(constant::SUBSCRIBE_CONFIG_TOPIC);
                 mqtt_client.subscribe(constant::SUBSCRIBE_ACTUATOR_TOPIC);
+                mqtt_client.subscribe(constant::ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
             }
             else
             {
