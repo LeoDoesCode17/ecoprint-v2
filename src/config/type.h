@@ -26,6 +26,7 @@ typedef struct
 enum state_machine
 {
     IDLE,
+    PREPARATION,
     FILLING_WATER,
     FIRING,
     HEATING,
