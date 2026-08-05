@@ -81,7 +81,8 @@ namespace
                 Serial.println("[MQTT] Missing required fields");
                 return;
             }
-            if (strcmp(actuator, "servo_valve") == 0) {
+            if (strcmp(actuator, "servo_valve") == 0)
+            {
                 actuator_manager::open_valve_by_percent(value);
                 Serial.printf("[ACTUATOR] Opening servo valve by %d%\n", value);
             }
@@ -156,7 +157,8 @@ namespace network_manager
             Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_SENSORS_TOPIC);
         }
     }
-    void mqtt_loop() {
+    void mqtt_loop()
+    {
         mqtt::loop();
     }
 }
