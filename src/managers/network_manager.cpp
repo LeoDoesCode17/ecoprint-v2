@@ -9,7 +9,7 @@
 
 namespace
 {
-    static const int SENSOR_MESSAGE_BUFFER_SIZE = 200;
+    static const int SENSOR_MESSAGE_BUFFER_SIZE = 256;
     static const int STATUS_MESSAGE_BUFFER_SIZE = 64;
     static const int ISO8601_BUFFER_SIZE = 26;
     static void init_time()
@@ -63,9 +63,16 @@ namespace
 
         return true;
     }
+    void read_esp32_mac_address()
+    {
+        char mac[constant::MAC_BUF_SIZE];
+        wifi::copy_mac_address(mac, sizeof(mac));
+        Serial.print("[WIFI] ESP32 MAC address is: ");
+        Serial.println(mac);
+    }
     static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
     {
-        StaticJsonDocument<128> doc;
+        StaticJsonDocument<256> doc;
         DeserializationError err = deserializeJson(doc, payload, length);
         if (err)
         {
@@ -87,6 +94,38 @@ namespace
                 Serial.printf("[ACTUATOR] Opening servo valve by %d%\n", value);
             }
         }
+        else
+        {
+            const char *event = doc["event"];
+            if (!event)
+            {
+                Serial.println("[MQTT] Missing 'event' field");
+                return;
+            }
+
+            if (strcmp(event, "session_start") == 0)
+            {
+                const char *fabricType = doc["fabric_type"];
+                float boilingTemp = doc["boiling_temp"] | 0.0f; // 0.0f = default if missing
+
+                if (!fabricType)
+                {
+                    Serial.println("[MQTT] session_start: missing fabric_type");
+                    return;
+                }
+
+                Serial.printf("[MQTT] session_start — fabric: %s  temp: %.1f C\n",
+                              fabricType, boilingTemp);
+            }
+            else if (strcmp(event, "session_stop") == 0)
+            {
+                Serial.println("[MQTT] session_stop received");
+            }
+            else
+            {
+                Serial.printf("[MQTT] Unknown event: %s\n", event);
+            }
+        }
     }
 }
 namespace network_manager
@@ -96,7 +135,8 @@ namespace network_manager
         wifi::connect_or_reconnect();
         mqtt::initialize();
         init_time();
-        mqtt::set_callback(on_mqtt_message);
+        read_esp32_mac_address();
+        // mqtt::set_callback(on_mqtt_message);
     }
     void conect_or_reconnect()
     {
@@ -138,27 +178,33 @@ namespace network_manager
         }
 
         StaticJsonDocument<SENSOR_MESSAGE_BUFFER_SIZE> doc;
-        doc["water_temperature_celcius"] = water_temperature;
-        doc["air_temperature_celcius"] = air_temperature;
-        doc["air_humidity_percent"] = air_humidity;
-        doc["is_water_sufficient"] = is_water_sufficient;
-        doc["recorded_at"] = recorded_at;
+        doc["event"] = "preparation";
+        doc["water_temperature"] = water_temperature;
+        doc["air_temperature"] = air_temperature;
+        doc["humidity"] = air_humidity;
+        doc["water_sufficient"] = is_water_sufficient;
+        // doc["recorded_at"] = recorded_at;
 
         char payload[SENSOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
 
-        bool is_published = mqtt::publish_message(constant::PUBLISH_SENSORS_TOPIC, payload);
+        bool is_published = mqtt::publish_message(constant::ECOPRINT_PUBLISH_SENSORS_TOPIC, payload);
         if (is_published)
         {
-            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_SENSORS_TOPIC);
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, constant::ECOPRINT_PUBLISH_SENSORS_TOPIC);
         }
         else
         {
-            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_SENSORS_TOPIC);
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::ECOPRINT_PUBLISH_SENSORS_TOPIC);
         }
+
     }
     void mqtt_loop()
     {
         mqtt::loop();
+    }
+    void set_mqtt_callback(mqtt_callback callback)
+    {
+        mqtt::set_callback(callback);
     }
 }
