@@ -3,6 +3,7 @@
 #include "managers/sensor_manager.h"
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
+#include "managers/display_manager.h"
 #include "config/constants.h"
 #include "config/type.h"
 
@@ -16,7 +17,9 @@ namespace
   ecoprint_sensor_t global_sensor_data = {.water_temperature = 0.0f, .air_temperature = 0.5f, .air_humidity = 90.5f, .is_water_sufficient = true, .event = EcoprintEvent::PREPARATION};
 
   float global_constant_temperature = 0.0f;
-  unsigned long global;
+  unsigned long global_steaming_time = 7200000;
+
+  static bool sensorScreenShown = false;
 
   static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
   {
@@ -42,7 +45,7 @@ namespace
         Serial.printf("[ACTUATOR] Opening servo valve by %d%\n", value);
       }
     }
-    else if(strcmp(topic, constant::ECOPRINT_SUBSCRIBE_COMMAND_TOPIC))
+    else if (strcmp(topic, constant::ECOPRINT_SUBSCRIBE_COMMAND_TOPIC) == 0)
     {
       const char *event = doc["event"];
       if (!event)
@@ -55,6 +58,7 @@ namespace
       {
         const char *fabricType = doc["fabric_type"];
         float boilingTemp = doc["boiling_temp"] | 0.0f; // 0.0f = default if missing
+        global_constant_temperature = boilingTemp;
 
         if (!fabricType)
         {
@@ -64,27 +68,36 @@ namespace
 
         Serial.printf("[MQTT] session_start — fabric: %s  temp: %.1f C\n",
                       fabricType, boilingTemp);
+        global_device_status.state_machine = PREPARATION;
       }
       else if (strcmp(event, "session_stop") == 0)
       {
         Serial.println("[MQTT] session_stop received");
+        actuator_manager::close_valve();
       }
       else
       {
         Serial.printf("[MQTT] Unknown event: %s\n", event);
       }
-    } else {
+    }
+    else
+    {
       // TODO: IMPLEMENT IF OTHER TOPIC RECEIVED
     }
   }
 
-  static const char* event_to_string(EcoprintEvent event) {
-    switch (event) {
-        case EcoprintEvent::PREPARATION: return "preparation";
-        case EcoprintEvent::STEAMING:    return "steaming";
-        default:                         return "unknown";
+  static const char *event_to_string(EcoprintEvent event)
+  {
+    switch (event)
+    {
+    case EcoprintEvent::PREPARATION:
+      return "preparation";
+    case EcoprintEvent::STEAMING:
+      return "steaming";
+    default:
+      return "unknown";
     }
-}
+  }
 } // namespace
 
 void setup()
@@ -94,6 +107,7 @@ void setup()
   network_manager::initialize();
   network_manager::set_mqtt_callback(on_mqtt_message);
   sensor_manager::initialize();
+  display_manager::initialize();
 }
 
 void loop()
@@ -102,6 +116,10 @@ void loop()
   {
     network_manager::mqtt_loop();
     network_manager::conect_or_reconnect();
+    long encoderPosition = sensor_manager::getEncoderPosition();
+    bool buttonPressed = sensor_manager::wasEncoderButtonPressed();
+
+    display_manager::update(encoderPosition, buttonPressed);
 
     if (millis() - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
     {
@@ -118,9 +136,25 @@ void loop()
       last_publish_sensor_data = millis();
     }
 
+    if (global_sensor_data.water_temperature >= global_constant_temperature)
+      global_device_status.state_machine = STEAMING;
+
+    if ((global_device_status.state_machine == PREPARATION ||
+         global_device_status.state_machine == STEAMING) &&
+        !sensorScreenShown)
+    {
+      display_manager::showSensorScreen(global_sensor_data);
+      sensorScreenShown = true;
+    }
+
+    // Optionally, when IDLE, allow returning to main menu:
+    if (global_device_status.state_machine == IDLE)
+    {
+      sensorScreenShown = false;
+      // If you want to force main menu here, you can add:
+      // display_manager::initialize();  // or a dedicated showMainMenu() function
+    }
+
     last_main_loop = millis();
   }
-  // float temperature_celcius = sensor_manager::thermocouple_temperature_celcius();
-  // Serial.printf("Thermocouple temperature C: %.2f\n", temperature_celcius);
-  // delay(1000);
 }
