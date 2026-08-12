@@ -1,210 +1,208 @@
 #include "display_manager.h"
+#include "sensors/rotary_encoder.h"
+#include "config/pin.h"
 #include <TFT_eSPI.h>
-
-// If you have a display_config, keep using it. If not, see the alternate
-// color/size definitions below (commented).
-#include "config/display.h"
 
 namespace
 {
     TFT_eSPI tft;
 
-    enum class Screen : uint8_t
-    {
-        MAIN,
-        SENSOR
-    };
+    constexpr uint8_t BUTTON_COUNT = 3;
 
-    Screen currentScreen = Screen::MAIN;
-
-    // Simple button for MAIN menu
-    struct ButtonDef
+    struct MenuItem
     {
         const char *label;
-        int16_t x, y, w, h;
+        display_manager::ActionCallback callback;
     };
 
-    ButtonDef sensorButton;
+    void defaultAction1() { /* action 1 placeholder */ }
+    void defaultAction2() { /* action 2 placeholder */ }
+    void defaultAction3() { /* action 3 placeholder */ }
 
-    // Back button (used on SENSOR screen)
-    ButtonDef backButton;
+    MenuItem menuItems[BUTTON_COUNT] = {
+        {"Action 1", defaultAction1},
+        {"Action 2", defaultAction2},
+        {"Action 3", defaultAction3},
+    };
 
-    // -----------------------------------------------------------------
-    // Layout helpers
-    // -----------------------------------------------------------------
-    void computeSensorButtonLayout()
+    // Layout constants
+    constexpr int16_t BUTTON_X = 40;
+    constexpr int16_t BUTTON_W = 240;
+    constexpr int16_t BUTTON_H = 60;
+    constexpr int16_t BUTTON_GAP = 20;
+    constexpr int16_t BUTTON_START_Y = 90; // <-- shifted down to make room for temp readout
+
+    // --- NEW: temperature readout layout ---
+    constexpr int16_t TEMP_X = 40;
+    constexpr int16_t TEMP_Y = 20;
+    constexpr int16_t TEMP_W = 240;
+    constexpr int16_t TEMP_H = 50;
+
+    constexpr uint16_t COLOR_BG = TFT_BLACK;
+    constexpr uint16_t COLOR_IDLE_FILL = TFT_DARKGREY;
+    constexpr uint16_t COLOR_SELECTED_FILL = TFT_BLUE;
+    constexpr uint16_t COLOR_TEXT = TFT_WHITE;
+    constexpr uint16_t COLOR_BORDER = TFT_WHITE;
+    constexpr uint16_t COLOR_TEMP_FILL = TFT_BLACK; // <-- NEW
+
+    // State
+    long lastEncoderPos = 0;
+    uint8_t currentSelection = 0;
+    uint8_t lastDrawnSelection = 255; // force initial draw
+
+    // --- NEW: temperature dirty-check state ---
+    float currentTemperature = NAN;
+    float lastDrawnTemperature = NAN;
+    constexpr float TEMP_EPSILON = 0.05f; // ignore noise-level float jitter
+
+    int16_t buttonY(uint8_t index)
     {
-        sensorButton.label = "SENSOR";
-        sensorButton.w = 200;
-        sensorButton.h = 60;
-        sensorButton.x = (tft.width() - sensorButton.w) / 2;
-        sensorButton.y = 120;
+        return BUTTON_START_Y + index * (BUTTON_H + BUTTON_GAP);
     }
 
-    void computeBackButtonLayout()
+    void drawButton(uint8_t index, bool selected)
     {
-        backButton.label = "BACK";
-        backButton.w = 120;
-        backButton.h = 50;
-        backButton.x = (tft.width() - backButton.w) / 2;
-        backButton.y = tft.height() - backButton.h - 20;
-    }
+        int16_t y = buttonY(index);
+        uint16_t fillColor = selected ? COLOR_SELECTED_FILL : COLOR_IDLE_FILL;
 
-    // -----------------------------------------------------------------
-    // Drawing helpers
-    // -----------------------------------------------------------------
-    void drawButton(const ButtonDef &btn, uint16_t fillColor, uint16_t textColor)
-    {
-        tft.fillRoundRect(btn.x, btn.y, btn.w, btn.h, 10, fillColor);
-        tft.drawRoundRect(btn.x, btn.y, btn.w, btn.h, 10, TFT_WHITE);
+        tft.fillRoundRect(BUTTON_X, y, BUTTON_W, BUTTON_H, 8, fillColor);
+        tft.drawRoundRect(BUTTON_X, y, BUTTON_W, BUTTON_H, 8, COLOR_BORDER);
 
+        tft.setTextColor(COLOR_TEXT, fillColor);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(textColor, fillColor);
         tft.setTextSize(2);
-        tft.drawString(btn.label, btn.x + btn.w / 2, btn.y + btn.h / 2);
+        tft.drawString(menuItems[index].label, BUTTON_X + BUTTON_W / 2, y + BUTTON_H / 2);
     }
 
-    void drawMainScreen()
+    // --- NEW: draws (or redraws) just the temperature readout ---
+    void drawTemperature()
     {
-        tft.fillScreen(TFT_BLACK);
+        // Clear only the readout area, not the whole screen
+        tft.fillRect(TEMP_X, TEMP_Y, TEMP_W, TEMP_H, COLOR_TEMP_FILL);
+        tft.drawRoundRect(TEMP_X, TEMP_Y, TEMP_W, TEMP_H, 8, COLOR_BORDER);
 
-        // Title
-        tft.setTextDatum(TC_DATUM);
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.setTextSize(3);
-        tft.drawString("ECOPRINT", tft.width() / 2, 40);
-
-        drawButton(sensorButton, TFT_BLUE, TFT_WHITE);
-    }
-
-    void drawSensorScreen(const ecoprint_sensor_t &data)
-    {
-        tft.fillScreen(TFT_BLACK);
-
-        // Title
-        tft.setTextDatum(TC_DATUM);
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.setTextSize(2);
-        tft.drawString("SENSOR DATA", tft.width() / 2, 30);
-
-        const int16_t cx = tft.width() / 2;
-        int16_t y = 70;
-
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextColor(COLOR_TEXT, COLOR_TEMP_FILL);
+        tft.setTextDatum(MC_DATUM);
         tft.setTextSize(2);
 
-        auto drawLine = [&](const char *label, const char *value) {
-            tft.setTextDatum(ML_DATUM);
-            tft.drawString(label, cx - 10, y);
-            tft.setTextDatum(MR_DATUM);
-            tft.drawString(value, cx + 10, y);
-            y += tft.fontHeight() + 8;
-        };
-
-        char buf[16];
-
-        snprintf(buf, sizeof(buf), "%.1f C", data.water_temperature);
-        drawLine("Water Temp:", buf);
-
-        snprintf(buf, sizeof(buf), "%.1f C", data.air_temperature);
-        drawLine("Air Temp:", buf);
-
-        snprintf(buf, sizeof(buf), "%.1f %%", data.air_humidity);
-        drawLine("Humidity:", buf);
-
-        drawLine("Water:", data.is_water_sufficient ? "OK" : "LOW");
-
-        const char *eventStr = "UNKNOWN";
-        switch (data.event)
+        if (isnan(currentTemperature))
         {
-        case EcoprintEvent::PREPARATION:
-            eventStr = "PREPARATION";
-            break;
-        case EcoprintEvent::STEAMING:
-            eventStr = "STEAMING";
-            break;
+            tft.drawString("Temp: --.-C", TEMP_X + TEMP_W / 2, TEMP_Y + TEMP_H / 2);
         }
-        drawLine("Event:", eventStr);
+        else
+        {
+            char buffer[16];
+            snprintf(buffer, sizeof(buffer), "Temp: %.1fC", currentTemperature);
+            tft.drawString(buffer, TEMP_X + TEMP_W / 2, TEMP_Y + TEMP_H / 2);
+        }
 
-        // Back button
-        drawButton(backButton, TFT_DARKGREY, TFT_WHITE);
+        lastDrawnTemperature = currentTemperature;
     }
 
-    // -----------------------------------------------------------------
-    // Navigation
-    // -----------------------------------------------------------------
-    bool hitTest(const ButtonDef &btn, long encoderPosition)
+    // --- NEW: only redraw temperature if it actually changed ---
+    void redrawTemperatureIfDirty()
     {
-        // For now, we treat encoderPosition as a simple index:
-        // 0 = first button, 1 = second, etc.
-        // You can adapt this to your own selection logic.
-        return false; // not used in this minimal version
+        bool bothNan = isnan(currentTemperature) && isnan(lastDrawnTemperature);
+        bool changed = !bothNan &&
+                       fabs(currentTemperature - lastDrawnTemperature) > TEMP_EPSILON;
+
+        if (changed || (isnan(lastDrawnTemperature) != isnan(currentTemperature)))
+        {
+            drawTemperature();
+        }
     }
 
-    void enterMainScreen()
+    void drawAllButtons()
     {
-        currentScreen = Screen::MAIN;
-        drawMainScreen();
+        tft.fillScreen(COLOR_BG);
+        drawTemperature(); // <-- NEW: draw temp readout on initial paint
+        for (uint8_t i = 0; i < BUTTON_COUNT; ++i)
+        {
+            drawButton(i, i == currentSelection);
+        }
+        lastDrawnSelection = currentSelection;
     }
 
-    void enterSensorScreen(const ecoprint_sensor_t &data)
+    void redrawSelectionDelta()
     {
-        currentScreen = Screen::SENSOR;
-        drawSensorScreen(data);
+        if (currentSelection == lastDrawnSelection)
+        {
+            return;
+        }
+
+        if (lastDrawnSelection < BUTTON_COUNT)
+        {
+            drawButton(lastDrawnSelection, false);
+        }
+        drawButton(currentSelection, true);
+
+        lastDrawnSelection = currentSelection;
     }
-} // namespace
+
+    void handleNavigation()
+    {
+        long pos = rotary_encoder::getPosition();
+        long delta = pos - lastEncoderPos;
+
+        if (delta == 0)
+        {
+            return;
+        }
+        lastEncoderPos = pos;
+
+        int newSelection = (static_cast<int>(currentSelection) + static_cast<int>(delta)) % BUTTON_COUNT;
+        if (newSelection < 0)
+        {
+            newSelection += BUTTON_COUNT;
+        }
+
+        currentSelection = static_cast<uint8_t>(newSelection);
+    }
+
+    void handleClick()
+    {
+        if (rotary_encoder::wasButtonPressed())
+        {
+            if (menuItems[currentSelection].callback != nullptr)
+            {
+                menuItems[currentSelection].callback();
+            }
+        }
+    }
+}
 
 namespace display_manager
 {
     void initialize()
     {
+        rotary_encoder::setPosition(0);
+        lastEncoderPos = 0;
+        currentSelection = 0;
+
         tft.init();
-        tft.setRotation(1); // adjust as needed
-
-        computeSensorButtonLayout();
-        computeBackButtonLayout();
-
-        enterMainScreen();
+        tft.setRotation(1); // landscape; adjust to your panel orientation
+        drawAllButtons();
     }
 
-    void update(long encoderPosition, bool buttonPressed)
+    void update()
     {
-        // Minimal logic:
-        // - If on MAIN and button pressed -> go to SENSOR with dummy data
-        // - If on SENSOR and button pressed -> go back to MAIN
-        //
-        // In your real app, you’ll use encoderPosition to move selection
-        // and call showSensorScreen() from main.cpp instead of here.
+        handleNavigation();
+        redrawSelectionDelta();
+        redrawTemperatureIfDirty(); // <-- NEW
+        handleClick();
+    }
 
-        static bool lastButton = false;
-        bool edge = buttonPressed && !lastButton;
-        lastButton = buttonPressed;
-
-        if (!edge)
-            return;
-
-        if (currentScreen == Screen::MAIN)
+    void setActionCallback(uint8_t buttonIndex, ActionCallback callback)
+    {
+        if (buttonIndex < BUTTON_COUNT && callback != nullptr)
         {
-            // For now, just jump to sensor screen with dummy data.
-            // In your final version, you probably won't use this path
-            // and will call showSensorScreen() from main.cpp directly.
-            // ecoprint_sensor_t dummy{};
-            // dummy.water_temperature = 25.0f;
-            // dummy.air_temperature = 30.0f;
-            // dummy.air_humidity = 60.0f;
-            // dummy.is_water_sufficient = true;
-            // dummy.event = EcoprintEvent::PREPARATION;
-
-            // enterSensorScreen(dummy);
-        }
-        else if (currentScreen == Screen::SENSOR)
-        {
-            enterMainScreen();
+            menuItems[buttonIndex].callback = callback;
         }
     }
 
-    void showSensorScreen(const ecoprint_sensor_t &data)
+    // --- NEW ---
+    void setTemperature(float temperatureCelsius)
     {
-        enterSensorScreen(data);
+        currentTemperature = temperatureCelsius;
     }
 }
