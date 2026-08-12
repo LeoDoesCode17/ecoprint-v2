@@ -1,8 +1,8 @@
 #pragma once
 
 namespace pin {
-    const unsigned int THERMO_CLK_PIN = 14;
-    const unsigned int THERMO_CS_PIN = 27;
+    const unsigned int THERMO_CLK_PIN = 27;
+    const unsigned int THERMO_CS_PIN = 14;
     const unsigned int THERMO_SO_PIN = 13;
     const unsigned int SDA_PIN = 21;
     const unsigned int SCL_PIN = 22;
