@@ -27,7 +27,7 @@ namespace constant
     const int MAC_BUF_SIZE = 18;
 
     const unsigned long MAIN_LOOP_INTERVAL_MS = 10;
-    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 5000;
+    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1000;
     const unsigned long PUBLISH_DEVICE_STATUS_INTERVAL_MS = 10000;
 
     const int SHT3X_ADDR = 0x44;
