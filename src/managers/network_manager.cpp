@@ -183,7 +183,7 @@ namespace network_manager
         doc["air_temperature"] = air_temperature;
         doc["humidity"] = air_humidity;
         doc["water_sufficient"] = is_water_sufficient;
-        // doc["recorded_at"] = recorded_at;
+        doc["recorded_at"] = recorded_at;
 
         char payload[SENSOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
