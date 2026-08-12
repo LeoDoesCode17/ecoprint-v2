@@ -4,10 +4,8 @@ namespace constant
     const unsigned int ZERO_PERCENT_DEGREE = 6;
     const unsigned int VALVE_PERCENT_TO_DEGREE_GRADIENT = 94;
     const unsigned int VALVE_PERCENT_TO_DEGREE_OFFSET = 6;
-    const char WIFI_SSID[] = "Creator09";
-    const char WIFI_PASSWORD[] = "y4f89qkf";
-    // const char WIFI_SSID[] = "WIFI_SSID";
-    // const char WIFI_PASSWORD[] = "WIFI_PASSWORD";
+    const char WIFI_SSID[] = "WIFI_SSID";
+    const char WIFI_PASSWORD[] = "WIFI_PASSWORD";
     const char MQTT_BROKER_MDNS[] = "raspberrypi";
     const char ECOPRINT_MQTT_HOST[] = "ecoprint.vpspenelitian.com";
     const int MQTT_PORT = 1883;
