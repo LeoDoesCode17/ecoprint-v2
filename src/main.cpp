@@ -98,6 +98,22 @@ namespace
       return "unknown";
     }
   }
+
+  static void doAction1()
+  {
+    Serial.println("Close servo");
+    actuator_manager::close_valve();
+  }
+  static void doAction2()
+  {
+    Serial.println("Open servo 45 degree");
+    actuator_manager::open_valve_by_degree(45);
+  }
+  static void doAction3()
+  {
+    Serial.println("Open servo 90 degree");
+    actuator_manager::open_valve_by_degree(90);
+  }
 } // namespace
 
 void setup()
@@ -108,6 +124,9 @@ void setup()
   network_manager::set_mqtt_callback(on_mqtt_message);
   sensor_manager::initialize();
   display_manager::initialize();
+  display_manager::setActionCallback(0, doAction1);
+  display_manager::setActionCallback(1, doAction2);
+  display_manager::setActionCallback(2, doAction3);
 }
 
 void loop()
@@ -116,11 +135,9 @@ void loop()
   {
     network_manager::mqtt_loop();
     network_manager::conect_or_reconnect();
+    display_manager::update();
     long encoderPosition = sensor_manager::getEncoderPosition();
     bool buttonPressed = sensor_manager::wasEncoderButtonPressed();
-
-    display_manager::update(encoderPosition, buttonPressed);
-
     if (millis() - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
     {
       network_manager::publish_device_status(global_device_status);
@@ -133,28 +150,9 @@ void loop()
       global_sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
       global_sensor_data.air_humidity = sensor_manager::sht3x_humidity_percent();
       network_manager::publish_sensor_data(global_sensor_data);
+      display_manager::setTemperature(global_sensor_data.water_temperature);
       last_publish_sensor_data = millis();
     }
-
-    if (global_sensor_data.water_temperature >= global_constant_temperature)
-      global_device_status.state_machine = STEAMING;
-
-    if ((global_device_status.state_machine == PREPARATION ||
-         global_device_status.state_machine == STEAMING) &&
-        !sensorScreenShown)
-    {
-      display_manager::showSensorScreen(global_sensor_data);
-      sensorScreenShown = true;
-    }
-
-    // Optionally, when IDLE, allow returning to main menu:
-    if (global_device_status.state_machine == IDLE)
-    {
-      sensorScreenShown = false;
-      // If you want to force main menu here, you can add:
-      // display_manager::initialize();  // or a dedicated showMainMenu() function
-    }
-
     last_main_loop = millis();
   }
 }
