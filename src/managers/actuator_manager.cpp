@@ -17,4 +17,8 @@ namespace actuator_manager
     {
         servo_valve::close();
     }
+    void open_valve_by_degree(int degree)
+    {
+        servo_valve::open_by_degree(degree);
+    }
 }
