@@ -2,6 +2,11 @@
 #include "actuators/servo_valve.h"
 #include "config/constants.h"
 
+namespace 
+{
+    static bool _is_valve_open = false;
+} // namespace 
+
 namespace actuator_manager
 {
     void initialize()
@@ -16,9 +21,14 @@ namespace actuator_manager
     void close_valve()
     {
         servo_valve::close();
+        _is_valve_open = false;
     }
     void open_valve_by_degree(int degree)
     {
         servo_valve::open_by_degree(degree);
+        _is_valve_open = true;
+    }
+    bool is_valve_open() {
+        return _is_valve_open;
     }
 }
