@@ -12,6 +12,10 @@ namespace
     static const int SENSOR_MESSAGE_BUFFER_SIZE = 256;
     static const int STATUS_MESSAGE_BUFFER_SIZE = 64;
     static const int ISO8601_BUFFER_SIZE = 26;
+    constexpr size_t _TOPIC_BUF_SIZE = 48;
+    static char mac[constant::MAC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
+
     static void init_time()
     {
         configTime(0, 0, "pool.ntp.org", "time.nist.gov");
@@ -63,9 +67,8 @@ namespace
 
         return true;
     }
-    void read_esp32_mac_address()
+    static void read_esp32_mac_address()
     {
-        char mac[constant::MAC_BUF_SIZE];
         wifi::copy_mac_address(mac, sizeof(mac));
         Serial.print("[WIFI] ESP32 MAC address is: ");
         Serial.println(mac);
@@ -127,6 +130,13 @@ namespace
             }
         }
     }
+
+    static void build_sensors_publish_topic()
+    {
+        snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry", mac);
+        Serial.print("[MQTT] Sensors publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
+    }
 }
 namespace network_manager
 {
@@ -136,6 +146,7 @@ namespace network_manager
         mqtt::initialize();
         init_time();
         read_esp32_mac_address();
+        build_sensors_publish_topic();
         // mqtt::set_callback(on_mqtt_message);
     }
     void conect_or_reconnect()
@@ -188,16 +199,15 @@ namespace network_manager
         char payload[SENSOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
 
-        bool is_published = mqtt::publish_message(constant::ECOPRINT_PUBLISH_SENSORS_TOPIC, payload);
+        bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_SENSORS_TOPIC, payload);
         if (is_published)
         {
-            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, constant::ECOPRINT_PUBLISH_SENSORS_TOPIC);
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_SENSORS_TOPIC);
         }
         else
         {
-            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::ECOPRINT_PUBLISH_SENSORS_TOPIC);
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_SENSORS_TOPIC);
         }
-
     }
     void mqtt_loop()
     {
