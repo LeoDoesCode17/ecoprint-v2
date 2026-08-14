@@ -1,7 +1,7 @@
 #pragma once
 namespace constant
 {
-    const unsigned int ZERO_PERCENT_DEGREE = 6;
+    const unsigned int ZERO_PERCENT_DEGREE = 9;
     const unsigned int VALVE_PERCENT_TO_DEGREE_GRADIENT = 94;
     const unsigned int VALVE_PERCENT_TO_DEGREE_OFFSET = 6;
     const char WIFI_SSID[] = "WIFI_SSID";
@@ -21,8 +21,8 @@ namespace constant
     const char SUBSCRIBE_ACTUATOR_TOPIC[] = "ecoprint/mac-address/actuator";
     const char SUBSCRIBE_CONFIG_TOPIC[] = "ecoprint/mac-address/config";
 
-    const char ECOPRINT_PUBLISH_SENSORS_TOPIC[] = "esp/30:76:F5:EA:C9:8C/telemetry";
-    const char ECOPRINT_SUBSCRIBE_COMMAND_TOPIC[] = "esp/30:76:F5:EA:C9:8C/command";
+    const char ECOPRINT_PUBLISH_SENSORS_TOPIC[] = "esp/F4:65:0B:54:B0:54/telemetry";
+    const char ECOPRINT_SUBSCRIBE_COMMAND_TOPIC[] = "esp/F4:65:0B:54:B0:54/command";
 
     const int MAC_BUF_SIZE = 18;
 
