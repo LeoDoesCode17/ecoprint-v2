@@ -35,7 +35,8 @@ namespace constant
     const int EMA_SMOOTHING_FACTOR_SIZE = 5;
     const float EMA_SMOOTHING_FACTOR[] = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f};
 
-    const float HYSTERESIS_BAND = 3.0f;
+    const float UPPER_HYSTERESIS_BAND = 1.0f;
+    const float LOWER_HYSTERESIS_BAND = 1.0f;
     const float THERMOCOUPLE_OFFSET = 6.0f;
 
     const int SHT3X_ADDR = 0x44;
