@@ -9,4 +9,5 @@ namespace sensor_manager
     long getEncoderPosition();
     void setEncoderPosition(long position);
     bool wasEncoderButtonPressed();
+    float smoothed_thermocouple_temperature_celcius(int idx);
 }

@@ -3,13 +3,29 @@
 #include "sensors/sht3x.h"
 #include "sensors/rotary_encoder.h"
 #include "config/pin.h"
+#include "config/constants.h"
 
+namespace
+{
+    static const float SMOOTHING_FACTOR = 0.1;
+    static float filtered_water_temperature_value[constant::EMA_SMOOTHING_FACTOR_SIZE] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    static float raw_thermocouple_celcius_value = 0.0f;
+}
 namespace sensor_manager
 {
     void initialize()
     {
         sht3x::initialize();
         rotary_encoder::initialize(pin::ROTARY_ENCODER_DT, pin::ROTARY_ENCODER_CLK, pin::ROTARY_ENCODER_SW);
+
+        // initialize filter value
+        Serial.println("[SENSOR] Populating thermocouple filtered values");
+        for (size_t i = 0; i < constant::EMA_SMOOTHING_FACTOR_SIZE; i++)
+        {
+            filtered_water_temperature_value[i] = thermocouple::temperature_celcius();
+            delay(50);
+        }
+        Serial.println("[SENSOR] Populate thermocouple filtered values done");
     }
     float sht3x_temperature_celcius()
     {
@@ -37,4 +53,13 @@ namespace sensor_manager
     {
         return rotary_encoder::wasButtonPressed();
     }
+
+    float smoothed_thermocouple_temperature_celcius(int idx)
+    {
+        raw_thermocouple_celcius_value = thermocouple::temperature_celcius() + constant::THERMOCOUPLE_OFFSET;
+        Serial.printf("[SENSOR] RAW THERMOCOUPLE IS: %f\n", raw_thermocouple_celcius_value);
+        filtered_water_temperature_value[idx] = (raw_thermocouple_celcius_value * constant::EMA_SMOOTHING_FACTOR[idx]) + (filtered_water_temperature_value[idx] * (1 - constant::EMA_SMOOTHING_FACTOR[idx]));
+        return filtered_water_temperature_value[idx];
+    }
+
 }
