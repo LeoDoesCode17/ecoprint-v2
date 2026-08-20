@@ -12,15 +12,21 @@ namespace
   unsigned long last_main_loop = millis();
   unsigned long last_publish_sensor_data = millis();
   unsigned long last_publish_device_status = millis();
+  unsigned long last_update_sensor_data = millis();
 
-  ecoprint_device_t global_device_status = {.state_machine = IDLE, .is_active = true};
-  ecoprint_sensor_t global_sensor_data = {.water_temperature = 0.0f, .air_temperature = 0.5f, .air_humidity = 90.5f, .is_water_sufficient = true, .event = EcoprintEvent::PREPARATION};
-
+  static ecoprint_device_t global_device_status = {.state_machine = IDLE, .is_active = true};
+  static ecoprint_sensor_t global_sensor_data = {.water_temperature = 0.0f, .air_temperature = 0.5f, .air_humidity = 90.5f, .is_water_sufficient = true, .event = EcoprintEvent::PREPARATION};
+  static ema_filter_sensor_data_t global_ema_filtered_sensor_data[constant::EMA_SMOOTHING_FACTOR_SIZE] = {
+      {.water_temperature = 0.0f, .smoothing_factor = constant::EMA_SMOOTHING_FACTOR[0]},
+      {.water_temperature = 0.0f, .smoothing_factor = constant::EMA_SMOOTHING_FACTOR[1]},
+      {.water_temperature = 0.0f, .smoothing_factor = constant::EMA_SMOOTHING_FACTOR[2]},
+      {.water_temperature = 0.0f, .smoothing_factor = constant::EMA_SMOOTHING_FACTOR[3]},
+      {.water_temperature = 0.0f, .smoothing_factor = constant::EMA_SMOOTHING_FACTOR[4]},
+  };
   float global_constant_temperature = 0.0f;
   unsigned long global_steaming_time = 7200000;
 
-  static bool sensorScreenShown = false;
-
+  static bool is_start = false;
   static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
   {
     StaticJsonDocument<256> doc;
@@ -99,20 +105,23 @@ namespace
     }
   }
 
-  static void doAction1()
+  void onTargetTempSelected(uint8_t targetTemp)
   {
-    Serial.println("Close servo");
-    actuator_manager::close_valve();
-  }
-  static void doAction2()
-  {
-    Serial.println("Open servo 45 degree");
-    actuator_manager::open_valve_by_degree(45);
-  }
-  static void doAction3()
-  {
-    Serial.println("Open servo 90 degree");
+    Serial.printf("Target temperature set: %d C\n", targetTemp);
+    global_constant_temperature = targetTemp;
+    global_device_status.state_machine = PREPARATION;
+    is_start = true;
     actuator_manager::open_valve_by_degree(90);
+    // e.g. hand off to your process/state manager here
+  }
+
+  void onForceStop()
+  {
+    Serial.println("Force stop triggered — state reset");
+    global_device_status.state_machine = IDLE;
+    is_start = false;
+    actuator_manager::close_valve();
+    // e.g. shut off servo, cancel timers in your process manager
   }
 } // namespace
 
@@ -124,9 +133,13 @@ void setup()
   network_manager::set_mqtt_callback(on_mqtt_message);
   sensor_manager::initialize();
   display_manager::initialize();
-  display_manager::setActionCallback(0, doAction1);
-  display_manager::setActionCallback(1, doAction2);
-  display_manager::setActionCallback(2, doAction3);
+  display_manager::setOnTargetTemperatureSelected(onTargetTempSelected);
+  display_manager::setOnForceStop(onForceStop);
+
+  for (size_t i = 0; i < constant::EMA_SMOOTHING_FACTOR_SIZE; i++)
+  {
+    global_ema_filtered_sensor_data[i].water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(i);
+  }
 }
 
 void loop()
@@ -144,14 +157,49 @@ void loop()
       last_publish_device_status = millis();
     }
 
-    if (millis() - last_publish_sensor_data >= constant::PUBLISH_SENSOR_DATA_INTERVAL_MS)
+    if (millis() - last_update_sensor_data >= constant::UPDATE_SENSOR_DATA_INTERVAL_MS)
     {
-      global_sensor_data.water_temperature = sensor_manager::thermocouple_temperature_celcius();
+      global_sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
       global_sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
       global_sensor_data.air_humidity = sensor_manager::sht3x_humidity_percent();
+      display_manager::setMeasuredTemperature(global_sensor_data.water_temperature);
+      display_manager::setServoValveState(actuator_manager::is_valve_open());
+      last_update_sensor_data = millis();
+    }
+
+    if (millis() - last_publish_sensor_data >= constant::PUBLISH_SENSOR_DATA_INTERVAL_MS)
+    {
       network_manager::publish_sensor_data(global_sensor_data);
-      display_manager::setTemperature(global_sensor_data.water_temperature);
       last_publish_sensor_data = millis();
+    }
+
+    if (is_start)
+    {
+      if (global_sensor_data.water_temperature >= global_constant_temperature + constant::HYSTERESIS_BAND)
+      {
+        if (global_device_status.state_machine != STEAMING)
+        {
+          global_device_status.state_machine = STEAMING;
+        }
+        actuator_manager::close_valve();
+      }
+      else if (global_sensor_data.water_temperature < global_constant_temperature - constant::HYSTERESIS_BAND)
+      {
+        actuator_manager::open_valve_by_degree(90);
+      }
+    }
+    else
+    {
+      actuator_manager::close_valve();
+    }
+
+    if (global_device_status.state_machine == PREPARATION)
+    {
+      display_manager::setStatus(display_manager::ProcessStatus::PREPARATION, 0); // start 120-min countdown
+    }
+    else if (global_device_status.state_machine == STEAMING)
+    {
+      display_manager::setStatus(display_manager::ProcessStatus::STEAMING, 7200); // start 120-min countdown
     }
     last_main_loop = millis();
   }
