@@ -19,6 +19,12 @@ typedef struct
 
 typedef struct
 {
+    float water_temperature;
+    float smoothing_factor;
+} ema_filter_sensor_data_t;
+
+typedef struct
+{
     int state_machine;
     bool is_active;
 } ecoprint_device_t;
