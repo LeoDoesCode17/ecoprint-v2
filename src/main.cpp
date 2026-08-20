@@ -175,7 +175,7 @@ void loop()
 
     if (is_start)
     {
-      if (global_sensor_data.water_temperature >= global_constant_temperature + constant::HYSTERESIS_BAND)
+      if (global_sensor_data.water_temperature >= global_constant_temperature + constant::UPPER_HYSTERESIS_BAND)
       {
         if (global_device_status.state_machine != STEAMING)
         {
@@ -183,7 +183,7 @@ void loop()
         }
         actuator_manager::close_valve();
       }
-      else if (global_sensor_data.water_temperature < global_constant_temperature - constant::HYSTERESIS_BAND)
+      else if (global_sensor_data.water_temperature < global_constant_temperature - constant::LOWER_HYSTERESIS_BAND)
       {
         actuator_manager::open_valve_by_degree(90);
       }
