@@ -3,17 +3,35 @@
 
 namespace display_manager
 {
-    using ActionCallback = void (*)();
+    enum class ProcessStatus
+    {
+        Persiapan,
+        Mengukus,
+        STEAMING,
+        PREPARATION
+    };
 
-    // Wire up encoder pins + TFT, draw the initial menu
+    using TargetTemperatureCallback = void (*)(uint8_t targetTempCelsius);
+    using ForceStopCallback = void (*)();
+
+    // Wire up encoder pins + TFT, draw the initial screen (main menu)
     void initialize();
 
-    // Call every loop() iteration — handles navigation, click, redraw
+    // Call every loop() iteration
     void update();
 
-    // Optional: register/override callbacks after initialize()
-    void setActionCallback(uint8_t buttonIndex, ActionCallback callback);
+    // Fired when a temperature button is clicked on the main menu
+    // (target temp is already applied internally before this fires)
+    void setOnTargetTemperatureSelected(TargetTemperatureCallback callback);
 
-    // Feed live sensor data in; only triggers a redraw if the value changed
-    void setTemperature(float temperatureCelsius);
-}
+    // Fired when the force stop button is clicked on the sensor screen
+    // (state is already reset + screen already switched before this fires)
+    void setOnForceStop(ForceStopCallback callback);
+
+    // --- Sensor screen live data setters ---
+    void setMeasuredTemperature(float temperatureCelsius);
+    void setServoValveState(bool isOn);
+
+    // durationSeconds is only used when status == Mengukus; starts/restarts the countdown
+    void setStatus(ProcessStatus status, uint32_t durationSeconds = 0);
+}   
