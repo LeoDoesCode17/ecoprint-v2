@@ -1,7 +1,8 @@
 #pragma once
 namespace constant
 {
-    const unsigned int ZERO_PERCENT_DEGREE = 9;
+    const unsigned int ZERO_PERCENT_DEGREE = 0;
+    // const unsigned int ZERO_PERCENT_DEGREE = 9;
     const unsigned int VALVE_PERCENT_TO_DEGREE_GRADIENT = 94;
     const unsigned int VALVE_PERCENT_TO_DEGREE_OFFSET = 6;
     const char WIFI_SSID[] = "WIFI_SSID";
@@ -27,8 +28,15 @@ namespace constant
     const int MAC_BUF_SIZE = 18;
 
     const unsigned long MAIN_LOOP_INTERVAL_MS = 10;
-    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1990;
+    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 9990;
+    const unsigned long UPDATE_SENSOR_DATA_INTERVAL_MS = 1990;
     const unsigned long PUBLISH_DEVICE_STATUS_INTERVAL_MS = 10000;
+
+    const int EMA_SMOOTHING_FACTOR_SIZE = 5;
+    const float EMA_SMOOTHING_FACTOR[] = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f};
+
+    const float HYSTERESIS_BAND = 3.0f;
+    const float THERMOCOUPLE_OFFSET = 6.0f;
 
     const int SHT3X_ADDR = 0x44;
 }
