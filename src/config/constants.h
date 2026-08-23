@@ -28,7 +28,7 @@ namespace constant
     const int MAC_BUF_SIZE = 18;
 
     const unsigned long MAIN_LOOP_INTERVAL_MS = 10;
-    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 9990;
+    const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1990;
     const unsigned long UPDATE_SENSOR_DATA_INTERVAL_MS = 1990;
     const unsigned long PUBLISH_DEVICE_STATUS_INTERVAL_MS = 10000;
 
