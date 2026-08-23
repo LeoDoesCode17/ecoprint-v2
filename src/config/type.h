@@ -13,7 +13,9 @@ typedef struct
     float water_temperature;
     float air_temperature;
     float air_humidity;
+    float setpoint_temperature;
     bool is_water_sufficient;
+    bool is_valve_open;
     EcoprintEvent event;
 } ecoprint_sensor_t;
 
