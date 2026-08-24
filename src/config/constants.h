@@ -37,7 +37,7 @@ namespace constant
 
     const float UPPER_HYSTERESIS_BAND = 0.559958f;//1.0f;
     const float LOWER_HYSTERESIS_BAND = 0.330914f;//1.0f;
-    const float THERMOCOUPLE_OFFSET = 6.0f;
+    const float THERMOCOUPLE_OFFSET = -2.0f;
 
     const int SHT3X_ADDR = 0x44;
 }
