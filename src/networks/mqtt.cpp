@@ -47,16 +47,17 @@ namespace mqtt
         // 3. Resolve Raspberry Pi IP address
         IPAddress brokerIp = resolveMdnsHost(constant::MQTT_BROKER_MDNS);
 
+        mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
         // 4. Configure MQTT server with the resolved IP
-        if (brokerIp != INADDR_NONE)
-        {
-            mqtt_client.setServer(brokerIp, constant::RASPI_MQTT_PORT);
-        }
-        else
-        {
-            // if not resolved, fallback to online hive IP or hostname
-            mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
-        }
+        // if (brokerIp != INADDR_NONE)
+        // {
+        //     mqtt_client.setServer(brokerIp, constant::RASPI_MQTT_PORT);
+        // }
+        // else
+        // {
+        //     // if not resolved, fallback to online hive IP or hostname
+        //     mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
+        // }
     }
     void connect_or_reconnect()
     {
