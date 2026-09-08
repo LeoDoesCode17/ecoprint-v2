@@ -1,9 +1,10 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <TFT_eSPI.h>
 #include "managers/sensor_manager.h"
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
-#include "managers/display_manager.h"
+#include "managers/page_manager.h"
 #include "config/constants.h"
 #include "config/type.h"
 
@@ -13,6 +14,8 @@ namespace
   unsigned long last_publish_sensor_data = millis();
   unsigned long last_publish_device_status = millis();
   unsigned long last_update_sensor_data = millis();
+
+  static TFT_eSPI tft = TFT_eSPI();
 
   static ecoprint_device_t global_device_status = {
       .state_machine = IDLE,
@@ -96,64 +99,30 @@ namespace
     }
   }
 
-  static const char *event_to_string(EcoprintEvent event)
-  {
-    switch (event)
-    {
-    case EcoprintEvent::PREPARATION:
-      return "preparation";
-    case EcoprintEvent::STEAMING:
-      return "steaming";
-    default:
-      return "unknown";
-    }
-  }
-
-  void onTargetTempSelected(uint8_t targetTemp)
-  {
-    Serial.printf("Target temperature set: %d C\n", targetTemp);
-    global_constant_temperature = targetTemp;
-    global_sensor_data.setpoint_temperature = targetTemp;
-    global_device_status.state_machine = PREPARATION;
-    is_start = true;
-    actuator_manager::open_valve_by_degree(90);
-    global_sensor_data.is_valve_open = true;
-    // e.g. hand off to your process/state manager here
-  }
-
-  void onForceStop()
-  {
-    Serial.println("Force stop triggered — state reset");
-    global_device_status.state_machine = IDLE;
-    is_start = false;
-    global_sensor_data.setpoint_temperature = 0.0f;
-    actuator_manager::close_valve();
-    global_sensor_data.is_valve_open = false;
-    // e.g. shut off servo, cancel timers in your process manager
-  }
 } // namespace
 
 void setup()
 {
   Serial.begin(115200);
+  tft.init();
+  tft.setRotation(1); // landscape - adjust to match your wiring/orientation
+  tft.fillScreen(TFT_BLACK);
+
   actuator_manager::initialize();
   network_manager::initialize();
   network_manager::set_mqtt_callback(on_mqtt_message);
   sensor_manager::initialize();
-  display_manager::initialize();
-  display_manager::setOnTargetTemperatureSelected(onTargetTempSelected);
-  display_manager::setOnForceStop(onForceStop);
+  page_manager::initialize(tft);
 }
 
 void loop()
 {
   if (millis() - last_main_loop >= constant::MAIN_LOOP_INTERVAL_MS)
   {
+    page_manager::update();
     network_manager::mqtt_loop();
     network_manager::conect_or_reconnect();
-    display_manager::update();
-    long encoderPosition = sensor_manager::getEncoderPosition();
-    bool buttonPressed = sensor_manager::wasEncoderButtonPressed();
+
     if (millis() - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
     {
       network_manager::publish_device_status(global_device_status);
@@ -166,8 +135,6 @@ void loop()
       global_sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
       global_sensor_data.air_humidity = sensor_manager::sht3x_humidity_percent();
       global_sensor_data.is_valve_open = actuator_manager::is_valve_open();
-      display_manager::setMeasuredTemperature(global_sensor_data.water_temperature);
-      display_manager::setServoValveState(actuator_manager::is_valve_open());
       last_update_sensor_data = millis();
     }
 
@@ -177,33 +144,6 @@ void loop()
       last_publish_sensor_data = millis();
     }
 
-    if (is_start)
-    {
-      if (global_sensor_data.water_temperature >= global_constant_temperature + constant::UPPER_HYSTERESIS_BAND)
-      {
-        if (global_device_status.state_machine != STEAMING)
-        {
-          global_device_status.state_machine = STEAMING;
-        }
-        actuator_manager::close_valve();
-      }
-      else if (global_sensor_data.water_temperature < global_constant_temperature - constant::LOWER_HYSTERESIS_BAND)
-      {
-        actuator_manager::open_valve_by_degree(90);
-      }
-    }
-    else
-    {
-      actuator_manager::close_valve();
-    }
-    if (global_device_status.state_machine == PREPARATION)
-    {
-      display_manager::setStatus(display_manager::ProcessStatus::PREPARATION, 0); // start 120-min countdown
-    }
-    else if (global_device_status.state_machine == STEAMING)
-    {
-      display_manager::setStatus(display_manager::ProcessStatus::STEAMING, 7200); // start 120-min countdown
-    }
     last_main_loop = millis();
   }
 }
