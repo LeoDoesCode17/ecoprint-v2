@@ -6,6 +6,7 @@
 #include "managers/sensor_manager.h"
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
+#include "config/constants.h"
 
 namespace pages
 {
@@ -58,11 +59,11 @@ namespace pages
         sensor_data.setpoint = sensor_manager::get_setpoint_temperature();
 
         actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
-        actuator_data.is_max_valve_opening = true;
+        actuator_data.is_max_valve_opening = actuator_manager::is_valve_max_opening();
         actuator_data.is_pump_on = actuator_manager::is_pump_on();
         actuator_data.is_valve_open = actuator_manager::is_valve_open();
         actuator_data.setpoint = sensor_manager::get_setpoint_temperature();
-        actuator_data.valve_degree = 10;
+        actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
 
         timer = sensor_manager::get_timer();
 
@@ -129,7 +130,6 @@ namespace pages
             sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
             sensor_data.is_fire_on = true;
             sensor_data.is_water_sufficient = true;
-            sensor_data.setpoint = sensor_manager::get_setpoint_temperature();
         }
 
         if (millis() - LAST_ACTUATOR_UPDATE >= ACTUATOR_UPDATE_INTERVAL_MS)
@@ -137,32 +137,40 @@ namespace pages
             LAST_ACTUATOR_UPDATE = millis();
 
             actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
-            actuator_data.is_max_valve_opening = true;
+            actuator_data.is_max_valve_opening = actuator_manager::is_valve_max_opening();
             actuator_data.is_pump_on = actuator_manager::is_pump_on();
             actuator_data.is_valve_open = actuator_manager::is_valve_open();
-            actuator_data.setpoint = sensor_manager::get_setpoint_temperature();
-            actuator_data.valve_degree = 10;
+            actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
         }
 
         if (millis() - LAST_PUBLISH_ACTUATOR_DATA >= PUBLISH_ACTUATOR_DATA_INTERVAL_MS)
         {
             LAST_PUBLISH_ACTUATOR_DATA = millis();
-
-            // publish actuator data
+            network_manager::publish_actuator_data(actuator_data);
         }
 
         if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
-
-            // publish sensor data
+            network_manager::publish_sensor_data(sensor_data);
         }
 
         if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
         {
             LAST_CONTROL = millis();
 
-            // control temperature
+            if (sensor_data.water_temperature >= sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND)
+            {
+                // small fire + pump on
+            }
+            else if (sensor_data.water_temperature <= sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND)
+            {
+                // big fire + pump off
+            }
+            else
+            {
+                // nothing change
+            }
         }
     }
 
