@@ -10,11 +10,13 @@
 namespace
 {
     static const int SENSOR_MESSAGE_BUFFER_SIZE = 256;
+    static const int ACTUATOR_MESSAGE_BUFFER_SIZE = 256;
     static const int STATUS_MESSAGE_BUFFER_SIZE = 64;
     static const int ISO8601_BUFFER_SIZE = 26;
     constexpr size_t _TOPIC_BUF_SIZE = 48;
     static char mac[constant::MAC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_ACTUATORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
 
     static void init_time()
@@ -134,10 +136,13 @@ namespace
 
     static void build_sensors_publish_topic()
     {
-        snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry", mac);
+        snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry/sensor", mac);
+        snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
         snprintf(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC), "esp/%s/ema/telemetry", mac);
         Serial.print("[MQTT] Sensors publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
+        Serial.print("[MQTT] Actuators publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_ACTUATORS_TOPIC);
         Serial.print("[MQTT] EMA filtered publish topic: ");
         Serial.println(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC);
     }
@@ -195,7 +200,6 @@ namespace network_manager
         }
 
         StaticJsonDocument<SENSOR_MESSAGE_BUFFER_SIZE> doc;
-        doc["event"] = "preparation";
         doc["water_temperature"] = water_temperature;
         doc["air_temperature"] = air_temperature;
         doc["humidity"] = air_humidity;
@@ -215,6 +219,35 @@ namespace network_manager
         else
         {
             Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_SENSORS_TOPIC);
+        }
+    }
+    void publish_actuator_data(ecoprint_actuator_t &actuator_data)
+    {
+        char recorded_at[ISO8601_BUFFER_SIZE];
+        if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
+        {
+            strcpy(recorded_at, "1970-01-01T00:00:00Z");
+        }
+        JsonDocument doc;
+        doc["valve_degree"] = actuator_data.valve_degree;
+        doc["is_valve_open"] = actuator_data.is_valve_open;
+        doc["is_max_valve_opening"] = actuator_data.is_max_valve_opening;
+        doc["is_pump_on"] = actuator_data.is_pump_on;
+        doc["is_lighter_on"] = actuator_data.is_lighter_on;
+        doc["setpoint"] = actuator_data.setpoint;
+        doc["recorded_at"] = recorded_at;
+
+        char payload[ACTUATOR_MESSAGE_BUFFER_SIZE];
+        serializeJson(doc, payload);
+
+        bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, payload);
+        if (is_published)
+        {
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_ACTUATORS_TOPIC);
+        }
+        else
+        {
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_ACTUATORS_TOPIC);
         }
     }
     void publish_ema_filtered_sensor_data(ema_filter_sensor_data_t sensor_data)
