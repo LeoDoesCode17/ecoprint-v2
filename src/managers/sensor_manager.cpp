@@ -11,6 +11,7 @@ namespace
     static float filtered_water_temperature_value[constant::EMA_SMOOTHING_FACTOR_SIZE] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     static float raw_thermocouple_celcius_value = 0.0f;
     static float _setpoint_temperature = 0;
+    static int _timer = 0;
 }
 namespace sensor_manager
 {
@@ -71,5 +72,11 @@ namespace sensor_manager
     {
         return _setpoint_temperature;
     }
-
+    void set_timer(int timer)
+    {
+        _timer = timer;
+    }
+    int get_timer() {
+        return _timer;
+    }
 }

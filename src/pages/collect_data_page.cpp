@@ -2,6 +2,7 @@
 #include "page_id.h"
 #include <Arduino.h>
 #include "managers/page_manager.h"
+#include "managers/sensor_manager.h"
 
 namespace pages
 {
@@ -186,8 +187,8 @@ namespace pages
         // Hand the configured values off to page_manager so the Sensor
         // Dashboard (or anything else) can read them after we navigate away -
         // this page's own members disappear the moment we leave it.
-        page_manager::set_temperature_celcius(_current_temparture_celcius_value);
-        page_manager::set_timer_minutes(_current_timer_minute_value);
+        sensor_manager::set_setpoint_temperature((float)_current_temparture_celcius_value);
+        sensor_manager::set_timer(_current_timer_minute_value);
         page_manager::navigateTo(PageId::SensorDashboard);
     }
 

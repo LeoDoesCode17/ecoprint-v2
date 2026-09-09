@@ -23,11 +23,49 @@ namespace pages
         const int back_button_height = 40;
         const int back_button_margin_x = 100;
 
-        const unsigned long refresh_interval_ms = 500;
+        unsigned long LAST_REFRESH = millis();
+        const unsigned long REFRESH_INTERVAL_MS = 500;
+
+        const unsigned long SENSOR_UPDATE_INTERVAL_MS = 1000;
+        unsigned long LAST_SENSOR_UPDATE = millis();
+
+        const unsigned long ACTUATOR_UPDATE_INTERVAL_MS = 1000;
+        unsigned long LAST_ACTUATOR_UPDATE = millis();
+
+        const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1000;
+        unsigned long LAST_PUBLISH_SENSOR_DATA = millis();
+
+        const unsigned long PUBLISH_ACTUATOR_DATA_INTERVAL_MS = 1000;
+        unsigned long LAST_PUBLISH_ACTUATOR_DATA = millis();
+
+        const unsigned long CONTROL_INTERVAL_MS = 100;
+        unsigned long LAST_CONTROL = millis();
+
+        ecoprint_sensor_t sensor_data;
+        ecoprint_actuator_t actuator_data;
+        int timer;
+
     }
 
     void SensorDashboardPage::onEnter(TFT_eSPI &tft)
     {
+        // init the struct variables
+        sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+        sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+        sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+        sensor_data.is_fire_on = true;
+        sensor_data.is_water_sufficient = true;
+        sensor_data.setpoint = sensor_manager::get_setpoint_temperature();
+
+        actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
+        actuator_data.is_max_valve_opening = true;
+        actuator_data.is_pump_on = actuator_manager::is_pump_on();
+        actuator_data.is_valve_open = actuator_manager::is_valve_open();
+        actuator_data.setpoint = sensor_manager::get_setpoint_temperature();
+        actuator_data.valve_degree = 10;
+
+        timer = sensor_manager::get_timer();
+
         int timerMinutes = page_manager::get_timer_minutes();
         _countdown_end_ms = millis() + static_cast<unsigned long>(timerMinutes) * 60000UL;
         _last_refresh_ms = 0;
@@ -63,6 +101,8 @@ namespace pages
     {
         // No focus to move, nothing to edit - the whole screen is read-only
         // except Back, so any click just leaves.
+        // Put the update sensor, publish message, and control here
+
         if (buttonPressed)
         {
             page_manager::navigateTo(PageId::Menu);
@@ -70,15 +110,59 @@ namespace pages
         }
 
         unsigned long now = millis();
-        if (now - _last_refresh_ms < refresh_interval_ms)
+        if (now - _last_refresh_ms >= REFRESH_INTERVAL_MS)
         {
-            return;
-        }
-        _last_refresh_ms = now;
+            _last_refresh_ms = now;
 
-        for (int i = 0; i < static_cast<int>(Field::Count); i++)
+            for (int i = 0; i < static_cast<int>(Field::Count); i++)
+            {
+                drawRow(tft, static_cast<Field>(i), false);
+            }
+        }
+
+        if (millis() - LAST_SENSOR_UPDATE >= SENSOR_UPDATE_INTERVAL_MS)
         {
-            drawRow(tft, static_cast<Field>(i), false);
+            LAST_SENSOR_UPDATE = millis();
+
+            sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+            sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+            sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+            sensor_data.is_fire_on = true;
+            sensor_data.is_water_sufficient = true;
+            sensor_data.setpoint = sensor_manager::get_setpoint_temperature();
+        }
+
+        if (millis() - LAST_ACTUATOR_UPDATE >= ACTUATOR_UPDATE_INTERVAL_MS)
+        {
+            LAST_ACTUATOR_UPDATE = millis();
+
+            actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
+            actuator_data.is_max_valve_opening = true;
+            actuator_data.is_pump_on = actuator_manager::is_pump_on();
+            actuator_data.is_valve_open = actuator_manager::is_valve_open();
+            actuator_data.setpoint = sensor_manager::get_setpoint_temperature();
+            actuator_data.valve_degree = 10;
+        }
+
+        if (millis() - LAST_PUBLISH_ACTUATOR_DATA >= PUBLISH_ACTUATOR_DATA_INTERVAL_MS)
+        {
+            LAST_PUBLISH_ACTUATOR_DATA = millis();
+
+            // publish actuator data
+        }
+
+        if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)
+        {
+            LAST_PUBLISH_SENSOR_DATA = millis();
+
+            // publish sensor data
+        }
+
+        if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
+        {
+            LAST_CONTROL = millis();
+
+            // control temperature
         }
     }
 
@@ -119,22 +203,22 @@ namespace pages
             break;
         }
         case Field::SetTemperature:
-            snprintf(buffer, bufferSize, "%d C", page_manager::get_temperature_celcius());
+            snprintf(buffer, bufferSize, "%.1f C", sensor_data.setpoint);
             break;
         case Field::WaterTemperature:
-            snprintf(buffer, bufferSize, "%.1f C", 20.0);
+            snprintf(buffer, bufferSize, "%.1f C", sensor_data.water_temperature);
             break;
         case Field::AirTemperature:
-            snprintf(buffer, bufferSize, "%.1f C", 20.0);
+            snprintf(buffer, bufferSize, "%.1f C", sensor_data.air_temperature);
             break;
         case Field::AirHumidity:
-            snprintf(buffer, bufferSize, "%.0f %%", 98.0);
+            snprintf(buffer, bufferSize, "%.0f %%", sensor_data.humidity);
             break;
         case Field::ValveStatus:
-            snprintf(buffer, bufferSize, "%s", true ? "Big" : "Little");
+            snprintf(buffer, bufferSize, "%s", actuator_manager::is_valve_open() ? "Big" : "Little");
             break;
         case Field::PumpStatus:
-            snprintf(buffer, bufferSize, "%s", true ? "On" : "Off");
+            snprintf(buffer, bufferSize, "%s", actuator_manager::is_pump_on() ? "On" : "Off");
             break;
         default:
             buffer[0] = '\0';
