@@ -10,6 +10,7 @@ namespace
     static const float SMOOTHING_FACTOR = 0.1;
     static float filtered_water_temperature_value[constant::EMA_SMOOTHING_FACTOR_SIZE] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     static float raw_thermocouple_celcius_value = 0.0f;
+    static float _setpoint_temperature = 0;
 }
 namespace sensor_manager
 {
@@ -60,6 +61,15 @@ namespace sensor_manager
         Serial.printf("[SENSOR] RAW THERMOCOUPLE IS: %f\n", raw_thermocouple_celcius_value);
         filtered_water_temperature_value[idx] = (raw_thermocouple_celcius_value * constant::EMA_SMOOTHING_FACTOR[idx]) + (filtered_water_temperature_value[idx] * (1 - constant::EMA_SMOOTHING_FACTOR[idx]));
         return filtered_water_temperature_value[idx];
+    }
+
+    void set_setpoint_temperature(float temperature)
+    {
+        _setpoint_temperature = temperature;
+    }
+    float get_setpoint_temperature()
+    {
+        return _setpoint_temperature;
     }
 
 }

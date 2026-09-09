@@ -1,7 +1,7 @@
 #include "collect_data_page.h"
 #include "page_id.h"
-#include "managers/page_manager.h"
 #include <Arduino.h>
+#include "managers/page_manager.h"
 
 namespace pages
 {
@@ -51,6 +51,10 @@ namespace pages
 
     void CollectDataPage::onExit()
     {
+        // Set private properties to default value
+        _is_editing = false;
+        _current_temparture_celcius_value = 0;
+        _current_timer_minute_value = 0;
     }
 
     void CollectDataPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)

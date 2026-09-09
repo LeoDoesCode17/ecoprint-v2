@@ -8,16 +8,25 @@ enum class EcoprintEvent : uint8_t
     STEAMING = 1,
 };
 
-typedef struct
+typedef struct ecoprint_sensor_t
 {
     float water_temperature;
     float air_temperature;
-    float air_humidity;
-    float setpoint_temperature;
+    float humidity;
     bool is_water_sufficient;
-    bool is_valve_open;
-    EcoprintEvent event;
+    bool is_fire_on;
+    int setpoint;
 } ecoprint_sensor_t;
+
+typedef struct ecoprint_actuator_t
+{
+    int valve_degree;
+    bool is_valve_open;
+    bool is_max_valve_opening;
+    bool is_pump_on;
+    bool is_lighter_on;
+    int setpoint;
+} ecoprint_actuator_t;
 
 typedef struct
 {
@@ -25,13 +34,7 @@ typedef struct
     float smoothing_factor;
 } ema_filter_sensor_data_t;
 
-typedef struct
-{
-    int state_machine;
-    bool is_active;
-} ecoprint_device_t;
-
-enum state_machine
+enum class StateMachine : uint8_t
 {
     IDLE,
     PREPARATION,
@@ -43,3 +46,9 @@ enum state_machine
     FAILED,
     ERROR
 };
+
+typedef struct
+{
+    StateMachine state_machine;
+    bool is_active;
+} ecoprint_device_t;

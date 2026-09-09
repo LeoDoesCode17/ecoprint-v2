@@ -5,6 +5,7 @@
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
 #include "managers/page_manager.h"
+#include "managers/state_manager.h"
 #include "config/constants.h"
 #include "config/type.h"
 
@@ -15,25 +16,11 @@ namespace
   unsigned long last_publish_device_status = millis();
   unsigned long last_update_sensor_data = millis();
 
+  // Scope global
   static TFT_eSPI tft = TFT_eSPI();
+  ecoprint_device_t global_device_status = {.state_machine = state_manager::get_state_machine(), .is_active = true};
 
-  static ecoprint_device_t global_device_status = {
-      .state_machine = IDLE,
-      .is_active = true};
-
-  static ecoprint_sensor_t global_sensor_data = {
-      .water_temperature = 0.0f,
-      .air_temperature = 0.5f,
-      .air_humidity = 90.5f,
-      .setpoint_temperature = 80.0f,
-      .is_water_sufficient = true,
-      .is_valve_open = false,
-      .event = EcoprintEvent::PREPARATION};
-
-  float global_constant_temperature = 0.0f;
-  unsigned long global_steaming_time = 7200000;
-
-  static bool is_start = false;
+  // Scope global (determine the message send from client to esp32)
   static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
   {
     StaticJsonDocument<256> doc;
@@ -71,7 +58,7 @@ namespace
       {
         const char *fabricType = doc["fabric_type"];
         float boilingTemp = doc["boiling_temp"] | 0.0f; // 0.0f = default if missing
-        global_constant_temperature = boilingTemp;
+        sensor_manager::set_setpoint_temperature(boilingTemp);
 
         if (!fabricType)
         {
@@ -81,7 +68,7 @@ namespace
 
         Serial.printf("[MQTT] session_start — fabric: %s  temp: %.1f C\n",
                       fabricType, boilingTemp);
-        global_device_status.state_machine = PREPARATION;
+        state_manager::set_state_machine(StateMachine::PREPARATION);
       }
       else if (strcmp(event, "session_stop") == 0)
       {
@@ -125,25 +112,9 @@ void loop()
 
     if (millis() - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
     {
-      network_manager::publish_device_status(global_device_status);
+      network_manager::publish_device_status(global_device_status); // see more
       last_publish_device_status = millis();
     }
-
-    if (millis() - last_update_sensor_data >= constant::UPDATE_SENSOR_DATA_INTERVAL_MS)
-    {
-      global_sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-      global_sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-      global_sensor_data.air_humidity = sensor_manager::sht3x_humidity_percent();
-      global_sensor_data.is_valve_open = actuator_manager::is_valve_open();
-      last_update_sensor_data = millis();
-    }
-
-    if (millis() - last_publish_sensor_data >= constant::PUBLISH_SENSOR_DATA_INTERVAL_MS)
-    {
-      network_manager::publish_sensor_data(global_sensor_data);
-      last_publish_sensor_data = millis();
-    }
-
     last_main_loop = millis();
   }
 }

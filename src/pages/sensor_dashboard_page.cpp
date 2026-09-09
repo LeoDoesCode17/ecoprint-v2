@@ -1,9 +1,11 @@
 #include "sensor_dashboard_page.h"
 #include "page_id.h"
-#include "managers/page_manager.h"
-#include "managers/sensor_manager.h"
 #include <Arduino.h>
 #include <string.h>
+#include "managers/page_manager.h"
+#include "managers/sensor_manager.h"
+#include "managers/actuator_manager.h"
+#include "managers/network_manager.h"
 
 namespace pages
 {
