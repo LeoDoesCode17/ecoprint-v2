@@ -227,7 +227,7 @@ namespace pages
             snprintf(buffer, bufferSize, "%.0f %%", sensor_data.humidity);
             break;
         case Field::ValveStatus:
-            snprintf(buffer, bufferSize, "%s", actuator_manager::is_valve_open() ? "Big" : "Little");
+            snprintf(buffer, bufferSize, "%s", actuator_manager::is_valve_open() ? (actuator_manager::is_valve_max_opening() ? "Wide" : "Narrow") : "Close");
             break;
         case Field::PumpStatus:
             snprintf(buffer, bufferSize, "%s", actuator_manager::is_pump_on() ? "On" : "Off");
