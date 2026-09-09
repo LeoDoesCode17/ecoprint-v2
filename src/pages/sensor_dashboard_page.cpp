@@ -96,6 +96,8 @@ namespace pages
 
     void SensorDashboardPage::onExit()
     {
+        actuator_manager::turn_off_pump();
+        actuator_manager::close_valve();
     }
 
     void SensorDashboardPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
@@ -161,11 +163,13 @@ namespace pages
 
             if (sensor_data.water_temperature >= sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND)
             {
-                // small fire + pump on
+                actuator_manager::turn_on_pump();
+                actuator_manager::open_narrow_valve();
             }
             else if (sensor_data.water_temperature <= sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND)
             {
-                // big fire + pump off
+                actuator_manager::turn_off_pump();
+                actuator_manager::open_wide_valve();
             }
             else
             {
