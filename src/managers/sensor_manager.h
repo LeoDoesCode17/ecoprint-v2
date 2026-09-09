@@ -12,4 +12,6 @@ namespace sensor_manager
     float smoothed_thermocouple_temperature_celcius(int idx);
     void set_setpoint_temperature(float temperature);
     float get_setpoint_temperature();
+    void set_timer(int timer);
+    int get_timer();
 }
