@@ -161,11 +161,11 @@ namespace network_manager
     void publish_device_status(ecoprint_device_t device_status)
     {
         const bool is_active = device_status.is_active;
-        const int device_state_machine = device_status.state_machine;
+        const int state_machine = static_cast<uint8_t>(device_status.state_machine);
 
         StaticJsonDocument<STATUS_MESSAGE_BUFFER_SIZE> doc;
         doc["is_active"] = is_active;
-        doc["device_state_machine"] = device_state_machine;
+        doc["state_machine"] = state_machine;
 
         char payload[STATUS_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
@@ -184,10 +184,10 @@ namespace network_manager
     {
         const float water_temperature = sensor_data.water_temperature;
         const float air_temperature = sensor_data.air_temperature;
-        const float air_humidity = sensor_data.air_humidity;
+        const float air_humidity = sensor_data.humidity;
         const bool is_water_sufficient = sensor_data.is_water_sufficient;
-        const bool is_valve_open = sensor_data.is_valve_open;
-        const float setpoint_temperature = sensor_data.setpoint_temperature;
+        const bool is_fire_on = sensor_data.is_fire_on;
+        const float setpoint_temperature = sensor_data.setpoint;
         char recorded_at[ISO8601_BUFFER_SIZE];
         if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
         {
@@ -202,7 +202,7 @@ namespace network_manager
         doc["water_sufficient"] = is_water_sufficient;
         doc["recorded_at"] = recorded_at;
         doc["setpoint"] = setpoint_temperature;
-        doc["is_valve_open"] = is_valve_open;
+        doc["is_fire_on"] = is_fire_on;
 
         char payload[SENSOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
