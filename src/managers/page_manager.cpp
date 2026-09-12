@@ -9,6 +9,7 @@
 #include "pages/modify_servo_page.h"
 #include "pages/collect_data_page.h"
 #include "pages/sensor_dashboard_page.h"
+#include "pages/setting_page.h"
 
 namespace
 {
@@ -40,6 +41,8 @@ namespace
             return &pages::collect_data_page;
         case pages::PageId::SensorDashboard:
             return &pages::sensor_dashboard_page;
+        case pages::PageId::Setting:
+            return &pages::settingPage;
         }
         return &pages::menuPage;
     }
