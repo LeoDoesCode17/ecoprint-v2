@@ -17,7 +17,7 @@ namespace pages
         const SettingItem items[] = {
             {"Sensor Calibration", PageId::SensorCalibration},
             {"Process Calibration", PageId::ProcessCalibration},
-            {"Back", PageId::Placeholder},
+            {"Back", PageId::Menu},
         };
 
         const int itemCount = sizeof(items) / sizeof(items[0]);
@@ -31,6 +31,12 @@ namespace pages
     void SettingPage::onEnter(TFT_eSPI &tft)
     {
         _selectedIndex = 0;
+
+        tft.fillScreen(TFT_BLACK);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextFont(4);
+        tft.drawString("SENSOR CALIBRATION", tft.width() / 2, 60);
         tft.fillScreen(TFT_BLACK);
         for (size_t i = 0; i < itemCount; i++)
         {
@@ -59,14 +65,14 @@ namespace pages
 
         if (buttonPressed)
         {
-            page_manager::navigateTo(items[_selectedIndex].target == PageId::Placeholder ? PageId::Menu : items[_selectedIndex].target);
+            page_manager::navigateTo(items[_selectedIndex].target);
         }
     }
     void SettingPage::drawButton(TFT_eSPI &tft, int index)
     {
         int y = marginTop + index * (buttonHeight + buttonGap);
         bool selected = (index == _selectedIndex);
-        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Placeholder ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
+        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Menu ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
 
         tft.fillRoundRect(marginX, y, tft.width() - 2 * marginX, buttonHeight, 8, fillColor);
         tft.setTextDatum(MC_DATUM);

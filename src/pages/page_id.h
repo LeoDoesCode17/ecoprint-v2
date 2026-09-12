@@ -15,6 +15,5 @@ namespace pages
         Setting,
         SensorCalibration,
         ProcessCalibration,
-        Placeholder
     };
 }
