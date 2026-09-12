@@ -10,6 +10,7 @@
 #include "pages/collect_data_page.h"
 #include "pages/sensor_dashboard_page.h"
 #include "pages/setting_page.h"
+#include "pages/sensor_calibration_page.h"
 
 namespace
 {
@@ -43,6 +44,8 @@ namespace
             return &pages::sensor_dashboard_page;
         case pages::PageId::Setting:
             return &pages::settingPage;
+        case pages::PageId::SensorCalibration:
+            return &pages::sensorCalibrationPage;
         }
         return &pages::menuPage;
     }
