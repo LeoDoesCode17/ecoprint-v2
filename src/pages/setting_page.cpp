@@ -36,7 +36,7 @@ namespace pages
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.setTextFont(4);
-        tft.drawString("SENSOR CALIBRATION", tft.width() / 2, 60);
+        tft.drawString("SETTING", tft.width() / 2, 60);
         tft.fillScreen(TFT_BLACK);
         for (size_t i = 0; i < itemCount; i++)
         {
