@@ -4,6 +4,7 @@
 
 namespace pages
 {
+    ProcessCalibrationPage processCalibrationPage;
     void ProcessCalibrationPage::onEnter(TFT_eSPI &tft)
     {
         _selectedIndex = 0;

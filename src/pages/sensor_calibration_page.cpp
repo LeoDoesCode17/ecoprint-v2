@@ -4,6 +4,7 @@
 
 namespace pages
 {
+    SensorCalibrationPage sensorCalibrationPage;
     void SensorCalibrationPage::onEnter(TFT_eSPI &tft)
     {
         _selectedIndex = 0;
