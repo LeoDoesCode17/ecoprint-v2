@@ -15,5 +15,6 @@ namespace pages
         Setting,
         SensorCalibration,
         ProcessCalibration,
+        ThermocoupleCalibration
     };
 }
