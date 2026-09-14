@@ -27,23 +27,20 @@ namespace pages
         unsigned long LAST_REFRESH = millis();
         const unsigned long REFRESH_INTERVAL_MS = 500;
 
-        const unsigned long SENSOR_UPDATE_INTERVAL_MS = 1000;
+        const unsigned long SENSOR_UPDATE_INTERVAL_MS = 1990;
         unsigned long LAST_SENSOR_UPDATE = millis();
 
-        const unsigned long ACTUATOR_UPDATE_INTERVAL_MS = 1000;
+        const unsigned long ACTUATOR_UPDATE_INTERVAL_MS = 90;
         unsigned long LAST_ACTUATOR_UPDATE = millis();
 
-        const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1000;
+        const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1990;
         unsigned long LAST_PUBLISH_SENSOR_DATA = millis();
 
-        const unsigned long PUBLISH_ACTUATOR_DATA_INTERVAL_MS = 1000;
-        unsigned long LAST_PUBLISH_ACTUATOR_DATA = millis();
-
-        const unsigned long CONTROL_INTERVAL_MS = 100;
+        const unsigned long CONTROL_INTERVAL_MS = 90;
         unsigned long LAST_CONTROL = millis();
 
         ecoprint_sensor_t sensor_data;
-        ecoprint_actuator_t actuator_data;
+        ecoprint_actuator_t previous_actuator_data, actuator_data;
         int timer;
 
     }
@@ -138,17 +135,31 @@ namespace pages
         {
             LAST_ACTUATOR_UPDATE = millis();
 
+            // copy current to previous
+            previous_actuator_data.is_lighter_on = actuator_data.is_lighter_on;
+            previous_actuator_data.is_max_valve_opening = actuator_data.is_max_valve_opening;
+            previous_actuator_data.is_pump_on = actuator_data.is_pump_on;
+            previous_actuator_data.is_valve_open = actuator_data.is_valve_open;
+            previous_actuator_data.valve_degree = actuator_data.valve_degree;
+
+            // update current data
             actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
             actuator_data.is_max_valve_opening = actuator_manager::is_valve_max_opening();
             actuator_data.is_pump_on = actuator_manager::is_pump_on();
             actuator_data.is_valve_open = actuator_manager::is_valve_open();
             actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
-        }
 
-        if (millis() - LAST_PUBLISH_ACTUATOR_DATA >= PUBLISH_ACTUATOR_DATA_INTERVAL_MS)
-        {
-            LAST_PUBLISH_ACTUATOR_DATA = millis();
-            network_manager::publish_actuator_data(actuator_data);
+            // compare current and previous
+            const bool is_different = (previous_actuator_data.is_lighter_on != actuator_data.is_lighter_on) ||
+                                      (previous_actuator_data.is_max_valve_opening != actuator_data.is_max_valve_opening) ||
+                                      (previous_actuator_data.is_pump_on != actuator_data.is_pump_on) ||
+                                      (previous_actuator_data.is_valve_open != actuator_data.is_valve_open) ||
+                                      (previous_actuator_data.valve_degree != actuator_data.valve_degree);
+
+            if (is_different)
+            {
+                network_manager::publish_actuator_data(actuator_data);
+            }
         }
 
         if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)

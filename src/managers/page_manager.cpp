@@ -9,6 +9,9 @@
 #include "pages/modify_servo_page.h"
 #include "pages/collect_data_page.h"
 #include "pages/sensor_dashboard_page.h"
+#include "pages/setting_page.h"
+#include "pages/sensor_calibration_page.h"
+#include "pages/process_calibration_page.h"
 
 namespace
 {
@@ -40,6 +43,12 @@ namespace
             return &pages::collect_data_page;
         case pages::PageId::SensorDashboard:
             return &pages::sensor_dashboard_page;
+        case pages::PageId::Setting:
+            return &pages::settingPage;
+        case pages::PageId::SensorCalibration:
+            return &pages::sensorCalibrationPage;
+        case pages::PageId::ProcessCalibration:
+            return &pages::processCalibrationPage;
         }
         return &pages::menuPage;
     }

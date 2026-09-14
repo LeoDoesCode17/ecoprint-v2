@@ -12,5 +12,8 @@ namespace pages
         ModifyServo,
         CollectData,
         SensorDashboard,
+        Setting,
+        SensorCalibration,
+        ProcessCalibration,
     };
 }

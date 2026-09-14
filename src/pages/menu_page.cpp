@@ -20,6 +20,7 @@ namespace pages
             {"Test Actuator", PageId::TestActuator},
             {"Modify Servo", PageId::ModifyServo},
             {"Collect Data", PageId::CollectData},
+            {"Setting", PageId::Setting},
         };
         const int itemCount = sizeof(items) / sizeof(items[0]);
 
