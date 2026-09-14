@@ -73,7 +73,7 @@ namespace pages
     {
         int y = marginTop + index * (buttonHeight + buttonGap);
         bool selected = (index == _selectedIndex);
-        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Menu ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
+        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Setting ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
 
         tft.fillRoundRect(marginX, y, tft.width() - 2 * marginX, buttonHeight, 8, fillColor);
         tft.setTextDatum(MC_DATUM);
