@@ -20,7 +20,8 @@ namespace pages
     }
     void SensorCalibrationPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
-        if (buttonPressed) {
+        if (buttonPressed)
+        {
             page_manager::navigateTo(PageId::Menu);
         }
     }
