@@ -43,6 +43,8 @@ namespace pages
         ecoprint_actuator_t previous_actuator_data, actuator_data;
         int timer;
 
+        bool is_steaming = false;
+
     }
 
     void SensorDashboardPage::onEnter(TFT_eSPI &tft)
@@ -129,6 +131,13 @@ namespace pages
             sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
             sensor_data.is_fire_on = true;
             sensor_data.is_water_sufficient = true;
+
+            if (!is_steaming) {
+                if (sensor_data.water_temperature >= sensor_data.setpoint) {
+                    is_steaming = true;
+                }
+            }
+            Serial.printf("[SENSOR] Thermocouple offset is: %f\n", sensor_manager::get_thermocouple_offset());
         }
 
         if (millis() - LAST_ACTUATOR_UPDATE >= ACTUATOR_UPDATE_INTERVAL_MS)
@@ -172,15 +181,20 @@ namespace pages
         {
             LAST_CONTROL = millis();
 
+            if (!is_steaming)
+            {
+                actuator_manager::open_wide_valve();
+            } else {
+                actuator_manager::open_narrow_valve();
+            }
+
             if (sensor_data.water_temperature >= sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND)
             {
                 actuator_manager::turn_on_pump();
-                actuator_manager::open_narrow_valve();
             }
             else if (sensor_data.water_temperature <= sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND)
             {
                 actuator_manager::turn_off_pump();
-                actuator_manager::open_wide_valve();
             }
             else
             {
