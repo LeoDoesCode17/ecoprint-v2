@@ -13,6 +13,7 @@
 #include "pages/sensor_calibration_page.h"
 #include "pages/process_calibration_page.h"
 #include "pages/thermocouple_calibration_page.h"
+#include "pages/hysteresis_calibration_page.h"
 
 namespace
 {
@@ -52,6 +53,8 @@ namespace
             return &pages::processCalibrationPage;
         case pages::PageId::ThermocoupleCalibration:
             return &pages::thermocoupleCalibrationPage;
+        case pages::PageId::HysteresisCalibration:
+            return &pages::hysteresisCalibrationPage;
         }
         return &pages::menuPage;
     }
