@@ -14,4 +14,6 @@ namespace sensor_manager
     float get_setpoint_temperature();
     void set_timer(int timer);
     int get_timer();
+    void set_thermocouple_offset(float offset);
+    float get_thermocouple_offset();
 }

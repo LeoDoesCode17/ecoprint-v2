@@ -12,6 +12,7 @@ namespace
     static float raw_thermocouple_celcius_value = 0.0f;
     static float _setpoint_temperature = 0;
     static int _timer = 0;
+    static float thermocouple_offset = 0.0f;
 }
 namespace sensor_manager
 {
@@ -58,7 +59,8 @@ namespace sensor_manager
 
     float smoothed_thermocouple_temperature_celcius(int idx)
     {
-        raw_thermocouple_celcius_value = thermocouple::temperature_celcius() + constant::THERMOCOUPLE_OFFSET;
+        raw_thermocouple_celcius_value = thermocouple::temperature_celcius() + thermocouple_offset;
+        // raw_thermocouple_celcius_value = thermocouple::temperature_celcius() + constant::THERMOCOUPLE_OFFSET;
         Serial.printf("[SENSOR] RAW THERMOCOUPLE IS: %f\n", raw_thermocouple_celcius_value);
         filtered_water_temperature_value[idx] = (raw_thermocouple_celcius_value * constant::EMA_SMOOTHING_FACTOR[idx]) + (filtered_water_temperature_value[idx] * (1 - constant::EMA_SMOOTHING_FACTOR[idx]));
         return filtered_water_temperature_value[idx];
@@ -76,7 +78,16 @@ namespace sensor_manager
     {
         _timer = timer;
     }
-    int get_timer() {
+    int get_timer()
+    {
         return _timer;
+    }
+    void set_thermocouple_offset(float offset)
+    {
+        thermocouple_offset = offset;
+    }
+    float get_thermocouple_offset()
+    {
+        return thermocouple_offset;
     }
 }
