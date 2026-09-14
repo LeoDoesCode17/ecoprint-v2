@@ -105,7 +105,7 @@ namespace pages
 
         if (buttonPressed)
         {
-            page_manager::navigateTo(PageId::Menu);
+            page_manager::navigateTo(PageId::CollectData);
             return;
         }
 

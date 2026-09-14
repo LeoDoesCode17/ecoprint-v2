@@ -22,7 +22,7 @@ namespace pages
     {
         if (buttonPressed)
         {
-            page_manager::navigateTo(PageId::Menu);
+            page_manager::navigateTo(PageId::Setting);
         }
     }
     void SensorCalibrationPage::drawButton(TFT_eSPI &tft, int index)
