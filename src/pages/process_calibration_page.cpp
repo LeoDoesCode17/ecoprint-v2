@@ -23,7 +23,6 @@ namespace pages
 
         const int buttonHeight = 60;
 
-        const int buttonHeight = 60;
         const int buttonGap = 15;
         const int marginX = 20;
         const int marginTop = 30;
