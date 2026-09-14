@@ -56,18 +56,18 @@ namespace pages
         sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
         sensor_data.is_fire_on = true;
         sensor_data.is_water_sufficient = true;
-        sensor_data.setpoint = sensor_manager::get_setpoint_temperature();
+        sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
         actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
         actuator_data.is_max_valve_opening = actuator_manager::is_valve_max_opening();
         actuator_data.is_pump_on = actuator_manager::is_pump_on();
         actuator_data.is_valve_open = actuator_manager::is_valve_open();
-        actuator_data.setpoint = sensor_manager::get_setpoint_temperature();
+        actuator_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
         actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
 
         timer = sensor_manager::get_timer();
 
-        int timerMinutes = page_manager::get_timer_minutes();
+        int timerMinutes = sensor_manager::get_timer();
         _countdown_end_ms = millis() + static_cast<unsigned long>(timerMinutes) * 60000UL;
         _last_refresh_ms = 0;
 
@@ -215,7 +215,7 @@ namespace pages
             break;
         }
         case Field::SetTemperature:
-            snprintf(buffer, bufferSize, "%.1f C", sensor_data.setpoint);
+            snprintf(buffer, bufferSize, "%d C", sensor_data.setpoint);
             break;
         case Field::WaterTemperature:
             snprintf(buffer, bufferSize, "%.1f C", sensor_data.water_temperature);
