@@ -132,8 +132,10 @@ namespace pages
             sensor_data.is_fire_on = true;
             sensor_data.is_water_sufficient = true;
 
-            if (!is_steaming) {
-                if (sensor_data.water_temperature >= sensor_data.setpoint) {
+            if (!is_steaming)
+            {
+                if (sensor_data.water_temperature >= sensor_data.setpoint)
+                {
                     is_steaming = true;
                 }
             }
@@ -181,24 +183,29 @@ namespace pages
         {
             LAST_CONTROL = millis();
 
-            if (!is_steaming)
-            {
-                actuator_manager::open_wide_valve();
-            } else {
-                actuator_manager::open_narrow_valve();
-            }
+            // if (!is_steaming)
+            // {
+            //     actuator_manager::open_wide_valve();
+            // } else {
+            //     actuator_manager::open_narrow_valve();
+            // }
+            const float temp = sensor_data.water_temperature;
+            const float upper = sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND;
+            const float lower = sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND;
 
-            if (sensor_data.water_temperature >= sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND)
+            if (temp >= upper)
             {
+                actuator_manager::open_narrow_valve();
                 actuator_manager::turn_on_pump();
             }
-            else if (sensor_data.water_temperature <= sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND)
+            else if (temp >= sensor_data.setpoint)
+            {
+                actuator_manager::open_narrow_valve();
+            }
+            else if (temp <= lower)
             {
                 actuator_manager::turn_off_pump();
-            }
-            else
-            {
-                // nothing change
+                actuator_manager::open_wide_valve();
             }
         }
     }
