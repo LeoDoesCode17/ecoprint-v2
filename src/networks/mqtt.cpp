@@ -95,11 +95,17 @@ namespace mqtt
     {
         return mqtt_client.connected();
     }
-    void set_callback(mqtt_callback callback) {
+    void set_callback(mqtt_callback callback)
+    {
         mqtt_client.setCallback(callback);
     }
     bool publish_message(const char *topic, const char *payload)
     {
         return mqtt_client.publish(topic, payload);
+    }
+    void subscribe_to_topic(const char *topic)
+    {
+        Serial.printf("[MQTT] Subscribed to topic %s\n", topic);
+        mqtt_client.subscribe(topic);
     }
 }

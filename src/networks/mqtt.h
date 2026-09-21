@@ -8,4 +8,5 @@ namespace mqtt {
     bool is_connected();
     void set_callback(mqtt_callback callback);
     bool publish_message(const char* topic, const char* payload);
+    void subscribe_to_topic(const char *topic);
 }
