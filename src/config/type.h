@@ -52,3 +52,8 @@ typedef struct
     StateMachine state_machine;
     bool is_active;
 } ecoprint_device_t;
+
+typedef struct
+{
+    int command;
+} ecoprint_command_t;
