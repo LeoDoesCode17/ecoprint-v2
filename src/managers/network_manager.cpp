@@ -6,18 +6,22 @@
 #include <ArduinoJson.h>
 #include <time.h>
 #include "actuator_manager.h"
+#include "state_manager.h"
 
 namespace
 {
     static const int SENSOR_MESSAGE_BUFFER_SIZE = 256;
     static const int ACTUATOR_MESSAGE_BUFFER_SIZE = 256;
     static const int STATUS_MESSAGE_BUFFER_SIZE = 64;
+    static const int COMMAND_MESSAGE_BUFFER_SIZE = 256;
     static const int ISO8601_BUFFER_SIZE = 26;
-    constexpr size_t _TOPIC_BUF_SIZE = 48;
+    constexpr size_t _TOPIC_BUF_SIZE = 64;
     static char mac[constant::MAC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_ACTUATORS_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
 
     static void init_time()
     {
@@ -76,7 +80,31 @@ namespace
         Serial.print("[WIFI] ESP32 MAC address is: ");
         Serial.println(mac);
     }
-    static void on_mqtt_message(char *topic, byte *payload, unsigned int length)
+
+    static void build_sensors_publish_topic()
+    {
+        snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry/sensor", mac);
+        snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
+        snprintf(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC), "esp/%s/ema/telemetry", mac);
+        snprintf(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC), "esp/%s/command/stop", mac);
+        Serial.print("[MQTT] Sensors publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
+        Serial.print("[MQTT] Actuators publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_ACTUATORS_TOPIC);
+        Serial.print("[MQTT] EMA filtered publish topic: ");
+        Serial.println(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC);
+        Serial.print("[MQTT] Stop command publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+    }
+
+    static void build_subscribe_topic()
+    {
+        snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start");
+        Serial.print("[MQTT] Start subscribe topic");
+        Serial.println(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
+    }
+
+    static void on_mqtt_message_callback(char *topic, byte *payload, unsigned int length)
     {
         StaticJsonDocument<256> doc;
         DeserializationError err = deserializeJson(doc, payload, length);
@@ -85,67 +113,22 @@ namespace
             Serial.printf("[MQTT] JSON parse failed: %s\n", err.c_str());
             return;
         }
-        if (strcmp(topic, constant::SUBSCRIBE_ACTUATOR_TOPIC) == 0)
+        const int command = doc["command"];
+        Serial.printf("[MQTT] Received message command from flutter command %d\n", command);
+        if (command == 0)
         {
-            const char *actuator = doc["actuator"];
-            const int value = doc["value"];
-            if (!actuator)
-            {
-                Serial.println("[MQTT] Missing required fields");
-                return;
-            }
-            if (strcmp(actuator, "servo_valve") == 0)
-            {
-                actuator_manager::open_valve_by_percent(value);
-                Serial.printf("[ACTUATOR] Opening servo valve by %d%\n", value);
-            }
+            state_manager::set_state_machine(StateMachine::IDLE);
+        }
+        else if (command == 1)
+        {
+            state_manager::set_state_machine(StateMachine::PREPARATION);
         }
         else
         {
-            const char *event = doc["event"];
-            if (!event)
-            {
-                Serial.println("[MQTT] Missing 'event' field");
-                return;
-            }
-
-            if (strcmp(event, "session_start") == 0)
-            {
-                const char *fabricType = doc["fabric_type"];
-                float boilingTemp = doc["boiling_temp"] | 0.0f; // 0.0f = default if missing
-
-                if (!fabricType)
-                {
-                    Serial.println("[MQTT] session_start: missing fabric_type");
-                    return;
-                }
-
-                Serial.printf("[MQTT] session_start — fabric: %s  temp: %.1f C\n",
-                              fabricType, boilingTemp);
-            }
-            else if (strcmp(event, "session_stop") == 0)
-            {
-                Serial.println("[MQTT] session_stop received");
-            }
-            else
-            {
-                Serial.printf("[MQTT] Unknown event: %s\n", event);
-            }
+            Serial.printf("[MQTT] Undefined receive command %d\n", command);
         }
     }
 
-    static void build_sensors_publish_topic()
-    {
-        snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry/sensor", mac);
-        snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
-        snprintf(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC), "esp/%s/ema/telemetry", mac);
-        Serial.print("[MQTT] Sensors publish topic: ");
-        Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
-        Serial.print("[MQTT] Actuators publish topic: ");
-        Serial.println(ECOPRINT_PUBLISH_ACTUATORS_TOPIC);
-        Serial.print("[MQTT] EMA filtered publish topic: ");
-        Serial.println(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC);
-    }
 }
 namespace network_manager
 {
@@ -156,7 +139,9 @@ namespace network_manager
         init_time();
         read_esp32_mac_address();
         build_sensors_publish_topic();
-        // mqtt::set_callback(on_mqtt_message);
+        build_subscribe_topic();
+        mqtt::set_callback(on_mqtt_message_callback);
+        mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
     }
     void conect_or_reconnect()
     {
@@ -203,7 +188,7 @@ namespace network_manager
         doc["water_temperature"] = water_temperature;
         doc["air_temperature"] = air_temperature;
         doc["humidity"] = air_humidity;
-        doc["water_sufficient"] = is_water_sufficient;
+        doc["is_water_sufficient"] = is_water_sufficient;
         doc["recorded_at"] = recorded_at;
         doc["setpoint"] = setpoint_temperature;
         doc["is_fire_on"] = is_fire_on;
@@ -283,8 +268,29 @@ namespace network_manager
     {
         mqtt::loop();
     }
-    void set_mqtt_callback(mqtt_callback callback)
+
+    void publish_stop_message(ecoprint_command_t command_data)
     {
-        mqtt::set_callback(callback);
+        char recorded_at[ISO8601_BUFFER_SIZE];
+        if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
+        {
+            strcpy(recorded_at, "1970-01-01T00:00:00Z");
+        }
+        StaticJsonDocument<SENSOR_MESSAGE_BUFFER_SIZE> doc;
+        doc["recorded_at"] = recorded_at;
+        doc["command"] = command_data.command;
+        char payload[COMMAND_MESSAGE_BUFFER_SIZE];
+        serializeJson(doc, payload);
+
+        bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC, payload);
+
+        if (is_published)
+        {
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        }
+        else
+        {
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        }
     }
 }
