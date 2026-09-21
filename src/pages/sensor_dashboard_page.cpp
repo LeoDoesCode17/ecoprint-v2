@@ -24,6 +24,9 @@ namespace pages
         const int back_button_height = 40;
         const int back_button_margin_x = 100;
 
+        unsigned long LAST_UPDATE_DEVICE_STATUS = millis();
+        const unsigned long UPDATE_DEVICE_STATUS_INTERVAL_MS = 1990;
+
         unsigned long LAST_REFRESH = millis();
         const unsigned long REFRESH_INTERVAL_MS = 500;
 
@@ -104,6 +107,9 @@ namespace pages
         // No focus to move, nothing to edit - the whole screen is read-only
         // except Back, so any click just leaves.
         // Put the update sensor, publish message, and control here
+
+        // only publish data sensors and actuator when state_machine is not idle
+        // ketika waktu sudah selesai maka publish stop command 
 
         if (buttonPressed)
         {
