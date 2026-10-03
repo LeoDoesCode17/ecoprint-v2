@@ -14,6 +14,7 @@
 #include "pages/process_calibration_page.h"
 #include "pages/thermocouple_calibration_page.h"
 #include "pages/hysteresis_calibration_page.h"
+#include "pages/steaming_summary_page.h"
 
 namespace
 {
@@ -55,6 +56,8 @@ namespace
             return &pages::thermocoupleCalibrationPage;
         case pages::PageId::HysteresisCalibration:
             return &pages::hysteresisCalibrationPage;
+        case pages::PageId::SteamingSummaryPage:
+            return &pages::steaming_summary_page;
         }
         return &pages::menuPage;
     }
