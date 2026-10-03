@@ -17,5 +17,6 @@ namespace pages
         ProcessCalibration,
         ThermocoupleCalibration,
         HysteresisCalibration,
+        SteamingSummaryPage,
     };
 }
