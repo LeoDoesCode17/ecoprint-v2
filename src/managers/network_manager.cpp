@@ -12,7 +12,7 @@ namespace
 {
     static const int SENSOR_MESSAGE_BUFFER_SIZE = 256;
     static const int ACTUATOR_MESSAGE_BUFFER_SIZE = 256;
-    static const int STATUS_MESSAGE_BUFFER_SIZE = 64;
+    static const int STATUS_MESSAGE_BUFFER_SIZE = 128;
     static const int COMMAND_MESSAGE_BUFFER_SIZE = 256;
     static const int ISO8601_BUFFER_SIZE = 26;
     constexpr size_t _TOPIC_BUF_SIZE = 64;
@@ -23,8 +23,17 @@ namespace
     static char ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
 
+    // for packet loss data
+    static unsigned long sensor_message_seq_id = 0;
+    static unsigned long actuator_message_seq_id = 0;
+    static unsigned long device_status_message_seq_id = 0;
+
     static void init_time()
     {
+        // gmt_offset_sec = 0
+        // daylight_offset_sec = 0
+        // server 1 = "pool.ntp.org"
+        // server 2 (if 1 fails) = "time.nist.gov"
         configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 
         Serial.print("[TIME] Syncing");
@@ -157,6 +166,10 @@ namespace network_manager
         doc["is_active"] = is_active;
         doc["state_machine"] = state_machine;
 
+        // increment device_status seq id
+        device_status_message_seq_id++;
+        doc["seq_id"] = device_status_message_seq_id;
+
         char payload[STATUS_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
 
@@ -193,6 +206,10 @@ namespace network_manager
         doc["setpoint"] = setpoint_temperature;
         doc["is_fire_on"] = is_fire_on;
 
+        // increment sensor seq id
+        sensor_message_seq_id++;
+        doc["seq_id"] = sensor_message_seq_id;
+
         char payload[SENSOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
 
@@ -221,6 +238,10 @@ namespace network_manager
         doc["is_lighter_on"] = actuator_data.is_lighter_on;
         doc["setpoint"] = actuator_data.setpoint;
         doc["recorded_at"] = recorded_at;
+
+        // increment actuator seq id
+        actuator_message_seq_id++;
+        doc["seq_id"] = actuator_message_seq_id;
 
         char payload[ACTUATOR_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
@@ -286,11 +307,35 @@ namespace network_manager
 
         if (is_published)
         {
+            // reset all seq ids
+            sensor_message_seq_id = 0;
+            actuator_message_seq_id = 0;
+            device_status_message_seq_id = 0;
+
             Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
         }
         else
         {
             Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        }
+    }
+
+    long get_message_seq_id(int index)
+    {
+        switch (index)
+        {
+        case 0:
+            return sensor_message_seq_id;
+            break;
+        case 1:
+            return actuator_message_seq_id;
+            break;
+        case 2:
+            return device_status_message_seq_id;
+            break;
+        default:
+            return constant::INVALID_SEQ_ID;
+            break;
         }
     }
 }
