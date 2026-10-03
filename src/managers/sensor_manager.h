@@ -16,4 +16,7 @@ namespace sensor_manager
     int get_timer();
     void set_thermocouple_offset(float offset);
     float get_thermocouple_offset();
+    bool is_fire_detected();
+    bool is_water_sufficient();
+    bool is_water_full();
 }
