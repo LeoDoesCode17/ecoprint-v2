@@ -199,6 +199,8 @@ namespace pages
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
             network_manager::publish_sensor_data(sensor_data);
+
+            // for data collecting
             network_manager::publish_actuator_data(actuator_data);
         }
 
