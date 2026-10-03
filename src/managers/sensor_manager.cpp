@@ -2,6 +2,7 @@
 #include "sensors/thermocouple.h"
 #include "sensors/sht3x.h"
 #include "sensors/rotary_encoder.h"
+#include "sensors/ir_flame.h"
 #include "config/pin.h"
 #include "config/constants.h"
 
@@ -20,6 +21,7 @@ namespace sensor_manager
     {
         sht3x::initialize();
         rotary_encoder::initialize(pin::ROTARY_ENCODER_DT, pin::ROTARY_ENCODER_CLK, pin::ROTARY_ENCODER_SW);
+        ir_flame::intialize();
 
         // initialize filter value
         Serial.println("[SENSOR] Populating thermocouple filtered values");
@@ -89,5 +91,10 @@ namespace sensor_manager
     float get_thermocouple_offset()
     {
         return thermocouple_offset;
+    }
+    bool is_fire_detected()
+    {
+        const int state = ir_flame::get_digital_output();
+        return state == LOW;
     }
 }
