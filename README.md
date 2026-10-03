@@ -237,7 +237,3 @@ Currently the firmware sets `IDLE` and `PREPARATION` (in response to MQTT comman
 - The Hysteresis calibration screen is a placeholder.
 - The thermocouple offset is not persisted across reboots.
 - MQTT connects without TLS or authentication.
-
-## License
-
-No license has been specified yet. Add a `LICENSE` file (for example MIT) before publishing.
