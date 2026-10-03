@@ -42,9 +42,12 @@ namespace pages
         const unsigned long CONTROL_INTERVAL_MS = 90;
         unsigned long LAST_CONTROL = millis();
 
+        const unsigned long UPDATE_TIMER_INTERVAL_MS = 1000;
+        unsigned long LAST_UPDATE_TIMER = millis();
+
         ecoprint_sensor_t sensor_data;
         ecoprint_actuator_t previous_actuator_data, actuator_data;
-        int timer;
+        unsigned long timer_second;
 
         bool is_steaming = false;
 
@@ -67,7 +70,7 @@ namespace pages
         actuator_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
         actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
 
-        timer = sensor_manager::get_timer();
+        timer_second = sensor_manager::get_timer() * 60;
 
         int timerMinutes = sensor_manager::get_timer();
         _countdown_end_ms = millis() + static_cast<unsigned long>(timerMinutes) * 60000UL;
@@ -118,6 +121,19 @@ namespace pages
         }
 
         unsigned long now = millis();
+        if (now - LAST_UPDATE_TIMER >= UPDATE_TIMER_INTERVAL_MS)
+        {
+            LAST_UPDATE_TIMER = millis();
+            timer_second--;
+            if (timer_second <= 0)
+            {
+                page_manager::navigateTo(PageId::SteamingSummaryPage);
+                // publish stop message to broker
+                const ecoprint_command_t command_data = {.command = 1};
+                network_manager::publish_stop_message(command_data);
+            }
+        }
+
         if (now - _last_refresh_ms >= REFRESH_INTERVAL_MS)
         {
             _last_refresh_ms = now;
@@ -183,6 +199,7 @@ namespace pages
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
             network_manager::publish_sensor_data(sensor_data);
+            network_manager::publish_actuator_data(actuator_data);
         }
 
         if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
