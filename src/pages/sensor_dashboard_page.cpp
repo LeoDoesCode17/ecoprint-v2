@@ -93,7 +93,7 @@ namespace pages
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(TFT_WHITE, TFT_RED);
         tft.setTextFont(4);
-        tft.drawString("Back", tft.width() / 2, back_button_y + back_button_height / 2);
+        tft.drawString("Stop", tft.width() / 2, back_button_y + back_button_height / 2);
     }
 
     void SensorDashboardPage::onExit()
@@ -109,11 +109,11 @@ namespace pages
         // Put the update sensor, publish message, and control here
 
         // only publish data sensors and actuator when state_machine is not idle
-        // ketika waktu sudah selesai maka publish stop command 
+        // ketika waktu sudah selesai maka publish stop command
 
         if (buttonPressed)
         {
-            page_manager::navigateTo(PageId::CollectData);
+            page_manager::navigateTo(PageId::SteamingSummaryPage);
             return;
         }
 
