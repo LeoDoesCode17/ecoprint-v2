@@ -108,7 +108,7 @@ namespace
 
     static void build_subscribe_topic()
     {
-        snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start");
+        snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         Serial.print("[MQTT] Start subscribe topic");
         Serial.println(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
     }
