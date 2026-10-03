@@ -3,6 +3,7 @@
 #include "sensors/sht3x.h"
 #include "sensors/rotary_encoder.h"
 #include "sensors/ir_flame.h"
+#include "sensors/float_switch.h"
 #include "config/pin.h"
 #include "config/constants.h"
 
@@ -22,6 +23,7 @@ namespace sensor_manager
         sht3x::initialize();
         rotary_encoder::initialize(pin::ROTARY_ENCODER_DT, pin::ROTARY_ENCODER_CLK, pin::ROTARY_ENCODER_SW);
         ir_flame::intialize();
+        float_switch::initialize();
 
         // initialize filter value
         Serial.println("[SENSOR] Populating thermocouple filtered values");
@@ -96,5 +98,17 @@ namespace sensor_manager
     {
         const int state = ir_flame::get_digital_output();
         return state == LOW;
+    }
+
+    bool is_water_sufficient()
+    {
+        const int min_float_switch_state = float_switch::get_min_float_switch_state();
+        return min_float_switch_state == LOW;
+    }
+
+    bool is_water_full()
+    {
+        const int max_float_switch_state = float_switch::get_max_float_switch_state();
+        return max_float_switch_state == LOW;
     }
 }
