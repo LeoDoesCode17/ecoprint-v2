@@ -10,4 +10,5 @@ namespace network_manager {
     void mqtt_loop();
     void publish_ema_filtered_sensor_data(ema_filter_sensor_data_t sensor_data);
     void publish_stop_message(ecoprint_command_t command_data);
+    long get_message_seq_id(int index);
 }
