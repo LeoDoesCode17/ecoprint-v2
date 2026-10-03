@@ -40,4 +40,6 @@ namespace constant
     const float THERMOCOUPLE_OFFSET = 0.0f;//-5.4f;
 
     const int SHT3X_ADDR = 0x44;
+
+    const long INVALID_SEQ_ID = -999;
 }
