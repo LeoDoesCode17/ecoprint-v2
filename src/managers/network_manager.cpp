@@ -162,9 +162,16 @@ namespace network_manager
         const bool is_active = device_status.is_active;
         const int state_machine = static_cast<uint8_t>(device_status.state_machine);
 
+        char recorded_at[ISO8601_BUFFER_SIZE];
+        if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
+        {
+            strcpy(recorded_at, "1970-01-01T00:00:00Z");
+        }
+
         StaticJsonDocument<STATUS_MESSAGE_BUFFER_SIZE> doc;
         doc["is_active"] = is_active;
         doc["state_machine"] = state_machine;
+        doc["recorded_at"] = recorded_at;
 
         // increment device_status seq id
         device_status_message_seq_id++;
@@ -307,11 +314,6 @@ namespace network_manager
 
         if (is_published)
         {
-            // reset all seq ids
-            sensor_message_seq_id = 0;
-            actuator_message_seq_id = 0;
-            device_status_message_seq_id = 0;
-
             Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
         }
         else
@@ -337,5 +339,11 @@ namespace network_manager
             return constant::INVALID_SEQ_ID;
             break;
         }
+    }
+
+    void reset_message_seq_id()
+    {
+        sensor_message_seq_id = 0;
+        actuator_message_seq_id = 0;
     }
 }
