@@ -19,6 +19,7 @@ namespace actuator_manager
     {
         servo_valve::initialize();
         pump::initialize();
+        lighter::initialize();
     }
     void open_valve_by_percent(float opening_percentage)
     {
