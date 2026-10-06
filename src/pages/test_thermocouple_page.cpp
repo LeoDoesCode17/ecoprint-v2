@@ -33,7 +33,7 @@ namespace pages
 
     void TestThermocouplePage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
-        if (millis() - UPDATE_DISPLAY_INTERVAL_MS)
+        if (millis() - last_update_display >= UPDATE_DISPLAY_INTERVAL_MS)
         {
             last_update_display = millis();
             tft.setTextFont(2);
