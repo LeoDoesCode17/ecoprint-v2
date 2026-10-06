@@ -17,6 +17,7 @@
 #include "pages/steaming_summary_page.h"
 #include "pages/test_sensor_list_page.h"
 #include "pages/test_thermocouple_page.h"
+#include "pages/test_sht_page.h"
 
 namespace
 {
@@ -64,6 +65,8 @@ namespace
             return &pages::test_sensor_list_page;
         case pages::PageId::TestThermocouple:
             return &pages::test_thermocouple_page;
+        case pages::PageId::TestSht:
+            return &pages::test_sht_page;
         }
         return &pages::menuPage;
     }
