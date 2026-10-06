@@ -66,9 +66,7 @@ namespace pages
 
         if (buttonPressed)
         {
-            Serial.print("[UI] Navigate to ");
-            Serial.println(static_cast<int>(items[_selectedIndex].target));
-            // page_manager::navigateTo(items[_selectedIndex].target);
+            page_manager::navigateTo(items[_selectedIndex].target);
         }
     }
     void TestSensorListPage::drawButton(TFT_eSPI &tft, int index)
