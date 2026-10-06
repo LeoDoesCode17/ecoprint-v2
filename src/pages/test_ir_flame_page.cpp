@@ -33,6 +33,7 @@ namespace pages
     {
         if (millis() - last_update_display >= UPDATE_DISPLAY_INTERVAL_MS)
         {
+            snprintf(ir_flame_state_label, sizeof(ir_flame_state_label), "");
             last_update_display = millis();
             tft.setTextFont(2);
             is_fire_detected = sensor_manager::is_fire_detected();

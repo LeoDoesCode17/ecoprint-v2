@@ -35,6 +35,7 @@ namespace pages
 
         if (millis() - last_update_display >= UPDATE_DISPLAY_INTERVAL_MS)
         {
+            snprintf(water_status_label, sizeof(water_status_label), "");
             last_update_display = millis();
             tft.setTextFont(2);
             is_water_sufficient = sensor_manager::is_water_sufficient();

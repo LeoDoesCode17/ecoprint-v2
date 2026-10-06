@@ -35,6 +35,7 @@ namespace pages
     {
         if (millis() - last_update_display >= UPDATE_DISPLAY_INTERVAL_MS)
         {
+            snprintf(thermocouple_sensor_label, sizeof(thermocouple_sensor_label), "");
             last_update_display = millis();
             tft.setTextFont(2);
             thermocouple_temperature = sensor_manager::thermocouple_temperature_celcius();
