@@ -1,50 +1,51 @@
-#include "setting_page.h"
+#include "test_sensor_list_page.h"
 #include "page_id.h"
 #include "managers/page_manager.h"
 
 namespace pages
 {
-    SettingPage settingPage;
+    TestSensorListPage test_sensor_list_page;
 
     namespace
     {
-        struct SettingItem
+        struct SensorItem
         {
             const char *label;
             PageId target;
         };
 
-        const SettingItem items[] = {
-            {"Sensor Calibration", PageId::SensorCalibration},
-            {"Process Calibration", PageId::ProcessCalibration},
-            {"Test Sensor", PageId::TestSensorList},
-            {"Back", PageId::Menu},
-        };
+        const SensorItem items[] = {
+            {"Test Thermocouple", PageId::TestThermocouple},
+            {"Test SHT3X", PageId::TestSht},
+            {"Test Float Switch", PageId::TestFloatSwitch},
+            {"Test IR Flame", PageId::TestIrFlame},
+            {"Back", PageId::Setting}};
 
         const int itemCount = sizeof(items) / sizeof(items[0]);
 
-        const int buttonHeight = 60;
-        const int buttonGap = 15;
-        const int marginX = 20;
-        const int marginTop = 30;
+        const int buttonHeight = 40;
+        const int buttonGap = 10;
+        const int marginX = 10;
+        const int marginTop = 50;
+
     }
 
-    void SettingPage::onEnter(TFT_eSPI &tft)
+    void TestSensorListPage::onEnter(TFT_eSPI &tft)
     {
         _selectedIndex = 0;
 
         tft.fillScreen(TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextFont(4);
-        tft.drawString("SETTING", tft.width() / 2, 60);        
+        tft.setTextFont(3);
+        tft.drawString("TEST SENSOR LIST", tft.width() / 2, 60);
         for (size_t i = 0; i < itemCount; i++)
         {
             drawButton(tft, i);
         }
     }
-    void SettingPage::onExit() {}
-    void SettingPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
+    void TestSensorListPage::onExit() {}
+    void TestSensorListPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
         if (encoderDelta != 0)
         {
@@ -65,19 +66,22 @@ namespace pages
 
         if (buttonPressed)
         {
-            page_manager::navigateTo(items[_selectedIndex].target);
+            Serial.print("[UI] Navigate to ");
+            Serial.println(static_cast<int>(items[_selectedIndex].target));
+            // page_manager::navigateTo(items[_selectedIndex].target);
         }
     }
-    void SettingPage::drawButton(TFT_eSPI &tft, int index)
+    void TestSensorListPage::drawButton(TFT_eSPI &tft, int index)
     {
         int y = marginTop + index * (buttonHeight + buttonGap);
         bool selected = (index == _selectedIndex);
-        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Menu ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
+        uint16_t fillColor = selected ? (items[_selectedIndex].target == PageId::Setting ? TFT_RED : TFT_BLUE) : TFT_DARKGREY;
 
         tft.fillRoundRect(marginX, y, tft.width() - 2 * marginX, buttonHeight, 8, fillColor);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(TFT_WHITE, fillColor);
-        tft.setTextFont(4);
+        tft.setTextFont(2);
         tft.drawString(items[index].label, tft.width() / 2, y + buttonHeight / 2);
     }
+
 }

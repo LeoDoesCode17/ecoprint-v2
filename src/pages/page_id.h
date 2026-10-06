@@ -18,5 +18,10 @@ namespace pages
         ThermocoupleCalibration,
         HysteresisCalibration,
         SteamingSummaryPage,
+        TestSensorList,
+        TestThermocouple,
+        TestSht,
+        TestFloatSwitch,
+        TestIrFlame
     };
 }
