@@ -17,6 +17,7 @@ namespace pages
         const SettingItem items[] = {
             {"Sensor Calibration", PageId::SensorCalibration},
             {"Process Calibration", PageId::ProcessCalibration},
+            {"Test Sensor", PageId::TestSensorList},
             {"Back", PageId::Menu},
         };
 
