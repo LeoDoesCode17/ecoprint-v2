@@ -15,6 +15,7 @@
 #include "pages/thermocouple_calibration_page.h"
 #include "pages/hysteresis_calibration_page.h"
 #include "pages/steaming_summary_page.h"
+#include "pages/test_sensor_list_page.h"
 
 namespace
 {
@@ -58,6 +59,8 @@ namespace
             return &pages::hysteresisCalibrationPage;
         case pages::PageId::SteamingSummaryPage:
             return &pages::steaming_summary_page;
+        case pages::PageId::TestSensorList:
+            return &pages::test_sensor_list_page;
         }
         return &pages::menuPage;
     }
