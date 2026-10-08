@@ -117,6 +117,8 @@ namespace pages
         if (buttonPressed)
         {
             page_manager::navigateTo(PageId::SteamingSummaryPage);
+            const ecoprint_command_t command_data = {.command = 1};
+            network_manager::publish_stop_message(command_data);
             return;
         }
 
