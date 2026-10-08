@@ -36,6 +36,8 @@ namespace pages
             snprintf(ir_flame_state_label, sizeof(ir_flame_state_label), "");
             last_update_display = millis();
             tft.setTextFont(2);
+            // Set padding width (in pixels) wide enough to cover the longest string ("Water status: SUFFIICIENT")
+            tft.setTextPadding(tft.width());
             is_fire_detected = sensor_manager::is_fire_detected();
             snprintf(ir_flame_state_label, sizeof(ir_flame_state_label), "FIRE STATUS: %s", is_fire_detected ? "DETECTED" : "UNDETECTED");
             tft.drawString(ir_flame_state_label, tft.width() / 2, tft.height() / 2 + 10);
@@ -46,6 +48,6 @@ namespace pages
             page_manager::navigateTo(PageId::TestSensorList);
         }
     }
-    
+
     void TestIrFlamePage::onExit() {}
 }

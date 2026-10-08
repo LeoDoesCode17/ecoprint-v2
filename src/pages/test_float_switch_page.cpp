@@ -32,17 +32,27 @@ namespace pages
 
     void TestFloatSwitchPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
-
         if (millis() - last_update_display >= UPDATE_DISPLAY_INTERVAL_MS)
         {
-            snprintf(water_status_label, sizeof(water_status_label), "");
             last_update_display = millis();
             tft.setTextFont(2);
+
+            // Ensure text color and background color are set
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+            // Set padding width (in pixels) wide enough to cover the longest string ("Water status: SUFFIICIENT")
+            tft.setTextPadding(tft.width());
+
             is_water_sufficient = sensor_manager::is_water_sufficient();
             is_water_full = sensor_manager::is_water_full();
-            snprintf(water_status_label, sizeof(water_status_label), "Water status: %s", is_water_full ? "FULL" : (is_water_sufficient ? "SUFFIICIENT" : "LACK"));
+
+            snprintf(water_status_label, sizeof(water_status_label), "Water status: %s",
+                     is_water_full ? "FULL" : (is_water_sufficient ? "SUFFIICIENT" : "LACK"));
+
             tft.drawString(water_status_label, tft.width() / 2, tft.height() / 2 + 10);
-            tft.drawString("Press button to return to the previous page", tft.width() / 2, tft.height() - 30);
+
+            // Reset padding to 0 so it doesn't affect other page elements
+            tft.setTextPadding(0);
         }
 
         if (buttonPressed)
@@ -50,5 +60,6 @@ namespace pages
             page_manager::navigateTo(PageId::TestSensorList);
         }
     }
+    
     void TestFloatSwitchPage::onExit() {}
 }
