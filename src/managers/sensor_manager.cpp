@@ -103,12 +103,16 @@ namespace sensor_manager
     bool is_water_sufficient()
     {
         const int min_float_switch_state = float_switch::get_min_float_switch_state();
-        return min_float_switch_state == LOW;
+        // Serial.print("[SENSOR] Min float switch state: ");
+        // Serial.println(min_float_switch_state);
+        return min_float_switch_state == HIGH;
     }
 
     bool is_water_full()
     {
         const int max_float_switch_state = float_switch::get_max_float_switch_state();
-        return max_float_switch_state == LOW;
+        // Serial.print("[SENSOR] Max float switch state: ");
+        // Serial.println(max_float_switch_state);
+        return max_float_switch_state == HIGH;
     }
 }
