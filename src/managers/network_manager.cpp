@@ -20,8 +20,10 @@ namespace
     static char ECOPRINT_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_ACTUATORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
 
     // Sequence IDs for packet loss tracking
     static unsigned long sensor_message_seq_id = 0;
@@ -77,7 +79,7 @@ namespace
 
         return true;
     }
-    
+
     static void read_esp32_mac_address()
     {
         wifi::copy_mac_address(mac, sizeof(mac));
@@ -91,6 +93,7 @@ namespace
         snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
         snprintf(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC), "esp/%s/ema/telemetry", mac);
         snprintf(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC), "esp/%s/command/stop", mac);
+        snprintf(ECOPRINT_PUBLISH_START_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         Serial.print("[MQTT] Sensors publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
         Serial.print("[MQTT] Actuators publish topic: ");
@@ -99,6 +102,8 @@ namespace
         Serial.println(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC);
         Serial.print("[MQTT] Stop command publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        Serial.print("[MQTT] Start command publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_START_COMMAND_TOPIC);
     }
 
     static void build_subscribe_topic()
@@ -106,6 +111,11 @@ namespace
         snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         Serial.print("[MQTT] Start subscribe topic: ");
         Serial.println(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
+        snprintf(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC,
+                 sizeof(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC),
+                 "esp/%s/command/stop", mac);
+        Serial.print("[MQTT] Start subscribe topic: ");
+        Serial.println(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
     }
 
     static void on_mqtt_message_callback(char *topic, byte *payload, unsigned int length)
@@ -153,6 +163,7 @@ namespace network_manager
         // Ensure active MQTT connection BEFORE subscribing to topics
         mqtt::connect_or_reconnect();
         mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
+        mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
 
         init_time();
     }
@@ -166,6 +177,7 @@ namespace network_manager
             mqtt::connect_or_reconnect();
             // Resubscribe to dynamic macro topic upon reconnection
             mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
+            mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
         }
     }
 
