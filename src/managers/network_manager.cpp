@@ -130,20 +130,34 @@ namespace
             return;
         }
 
-        const int command = doc["command"] | -1;
-        Serial.printf("[MQTT] Received message command from flutter: %d\n", command);
-
-        if (command == 0)
+        if (strcmp(topic, ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC) == 0)
         {
-            state_manager::set_state_machine(StateMachine::IDLE);
-        }
-        else if (command == 1)
-        {
+            Serial.println("[MQTT] Received message to start steaming");
+            const int setpoint = doc["setpoint"] | -1;
+            const int steaming_duration_minutes = doc["steaming_duration_minutes"] | -1;
+            Serial.print("[PROCESS] Setpoint is ");
+            Serial.print(setpoint);
+            Serial.println(" Celcius");
+            Serial.print("[PROCESS] Steaming duration ");
+            Serial.print(steaming_duration_minutes);
+            Serial.println(" minutes");
             state_manager::set_state_machine(StateMachine::PREPARATION);
         }
-        else
+
+        if (strcmp(topic, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC) == 0)
         {
-            Serial.printf("[MQTT] Undefined command %d\n", command);
+            Serial.println("[MQTT] Received message to stop steaming");
+            const int command = doc["command"] | -1;
+            Serial.printf("[MQTT] Received message command from flutter: %d\n", command);
+
+            if (command == 1)
+            {
+                state_manager::set_state_machine(StateMachine::IDLE);
+            }
+            else
+            {
+                Serial.printf("[MQTT] Undefined command %d\n", command);
+            }
         }
     }
 }
@@ -368,5 +382,31 @@ namespace network_manager
         sensor_message_seq_id = 0;
         actuator_message_seq_id = 0;
         device_status_message_seq_id = 0;
+    }
+
+    void publish_start_message(ecoprint_start_command_t start_command_data)
+    {
+        char recorded_at[ISO8601_BUFFER_SIZE];
+        if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
+        {
+            strcpy(recorded_at, "1970-01-01T00:00:00Z");
+        }
+        StaticJsonDocument<COMMAND_MESSAGE_BUFFER_SIZE> doc;
+        doc["recorded_at"] = recorded_at;
+        doc["setpoint"] = start_command_data.setpoint;
+        doc["steaming_duration_minutes"] = start_command_data.steaming_duration_minutes;
+        char payload[COMMAND_MESSAGE_BUFFER_SIZE];
+        serializeJson(doc, payload);
+
+        bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_START_COMMAND_TOPIC, payload);
+
+        if (is_published)
+        {
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        }
+        else
+        {
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
+        }
     }
 }

@@ -12,4 +12,5 @@ namespace network_manager {
     void publish_stop_message(ecoprint_command_t command_data);
     long get_message_seq_id(int index);
     void reset_message_seq_id();
+    void publish_start_message(ecoprint_start_command_t start_command_data);
 }
