@@ -57,3 +57,8 @@ typedef struct
 {
     int command;
 } ecoprint_command_t;
+
+typedef struct {
+    int setpoint;
+    int steaming_duration_minutes;
+} ecoprint_start_command_t;
