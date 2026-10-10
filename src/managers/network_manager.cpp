@@ -7,6 +7,7 @@
 #include <time.h>
 #include "actuator_manager.h"
 #include "state_manager.h"
+#include "sensor_manager.h"
 
 namespace
 {
@@ -139,6 +140,8 @@ namespace
             Serial.println("[MQTT] Received message to start steaming");
             const int setpoint = doc["setpoint"] | -1;
             const int steaming_duration_minutes = doc["steaming_duration_minutes"] | -1;
+            sensor_manager::set_setpoint_temperature(static_cast<float>(setpoint));
+            sensor_manager::set_timer(steaming_duration_minutes);
             Serial.print("[PROCESS] Setpoint is ");
             Serial.print(setpoint);
             Serial.println(" Celcius");
@@ -156,7 +159,7 @@ namespace
 
             if (command == 1)
             {
-                state_manager::set_state_machine(StateMachine::IDLE);
+                state_manager::set_state_machine(StateMachine::COMPLETED);
             }
             else
             {
