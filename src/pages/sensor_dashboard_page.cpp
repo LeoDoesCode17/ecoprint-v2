@@ -42,7 +42,7 @@ namespace pages
         const unsigned long CONTROL_INTERVAL_MS = 90;
         unsigned long LAST_CONTROL = millis();
 
-        const unsigned long UPDATE_TIMER_INTERVAL_MS = 1000;
+        const unsigned long UPDATE_TIMER_INTERVAL_MS = 990;
         unsigned long LAST_UPDATE_TIMER = millis();
 
         ecoprint_sensor_t sensor_data;
@@ -126,8 +126,11 @@ namespace pages
         if (now - LAST_UPDATE_TIMER >= UPDATE_TIMER_INTERVAL_MS)
         {
             LAST_UPDATE_TIMER = millis();
-            timer_second--;
-            if (timer_second <= 0)
+            if (timer_second > 0)
+            {
+                timer_second--;
+            }
+            else
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
                 // publish stop message to broker
