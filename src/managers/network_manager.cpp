@@ -24,6 +24,7 @@ namespace
     static char ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC[_TOPIC_BUF_SIZE];
 
     // Sequence IDs for packet loss tracking
     static unsigned long sensor_message_seq_id = 0;
@@ -94,6 +95,7 @@ namespace
         snprintf(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_EMA_FILTER_PUBLISH_SENSORS_TOPIC), "esp/%s/ema/telemetry", mac);
         snprintf(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC), "esp/%s/command/stop", mac);
         snprintf(ECOPRINT_PUBLISH_START_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
+        snprintf(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC, sizeof(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC), "esp/%s/telemetry/status", mac);
         Serial.print("[MQTT] Sensors publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
         Serial.print("[MQTT] Actuators publish topic: ");
@@ -104,6 +106,8 @@ namespace
         Serial.println(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
         Serial.print("[MQTT] Start command publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_START_COMMAND_TOPIC);
+        Serial.print("[MQTT] Telemetry status device publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC);
     }
 
     static void build_subscribe_topic()
@@ -217,14 +221,14 @@ namespace network_manager
         char payload[STATUS_MESSAGE_BUFFER_SIZE];
         serializeJson(doc, payload);
 
-        bool is_published = mqtt::publish_message(constant::PUBLISH_STATUS_TOPIC, payload);
+        bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC, payload);
         if (is_published)
         {
-            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_STATUS_TOPIC);
+            Serial.printf("[MQTT]: SUCCESS TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC);
         }
         else
         {
-            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, constant::PUBLISH_STATUS_TOPIC);
+            Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC);
         }
     }
 
