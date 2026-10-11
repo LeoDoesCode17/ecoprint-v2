@@ -3,9 +3,9 @@
 
 namespace pages
 {
-    // The number of buttons is entirely data-driven - see the `items[]`
-    // array in menu_page.cpp. Add or remove entries there to add or
-    // remove buttons; nothing else needs to change.
+    // Horizontal carousel menu. The number of cards is data-driven - see the
+    // `items[]` array in menu_page.cpp. Add or remove entries there; nothing
+    // else needs to change.
     class MenuPage : public IPage
     {
     public:
@@ -14,7 +14,10 @@ namespace pages
         void update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed) override;
 
     private:
-        void drawButton(TFT_eSPI &tft, int index);
+        void drawCarousel(TFT_eSPI &tft);
+        void drawCard(TFT_eSPI &tft, int itemIndex, int x, bool selected);
+        void drawDots(TFT_eSPI &tft);
+
         int selectedIndex_ = 0;
     };
 
