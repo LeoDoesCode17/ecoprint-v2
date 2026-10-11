@@ -21,6 +21,7 @@
 #include "pages/test_sht_page.h"
 #include "pages/test_ir_flame_page.h"
 #include "pages/test_float_switch_page.h"
+#include "pages/landing_page.h"
 
 namespace
 {
@@ -100,8 +101,10 @@ namespace
             return &pages::test_ir_flame_page;
         case pages::PageId::TestFloatSwitch:
             return &pages::test_float_switch_page;
+        case pages::PageId::Landing:
+            return &pages::landing_page;
         }
-        return &pages::menuPage;
+        return &pages::landing_page;
     }
 }
 
@@ -114,7 +117,7 @@ namespace page_manager
         lastState = state_manager::get_state_machine();
 
         // Navigate to page by id
-        navigateTo(pages::PageId::Menu);
+        navigateTo(pages::PageId::Landing);
     }
 
     void update()
