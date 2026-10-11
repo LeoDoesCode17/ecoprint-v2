@@ -1,5 +1,6 @@
 #include "page_manager.h"
 #include "sensor_manager.h"
+#include "state_manager.h"
 #include "pages/i_page.h"
 #include "pages/menu_page.h"
 #include "pages/page1.h"
@@ -25,9 +26,35 @@ namespace
 {
     TFT_eSPI *tftPtr = nullptr;
     pages::IPage *currentPage = nullptr;
+    pages::PageId currentPageId = pages::PageId::Menu; // NEW
+    StateMachine lastState = StateMachine::IDLE;       // NEW
     long lastEncoderPosition = 0;
 
     int _temperature_celcius = 0, _timer_minutes = 0;
+
+    bool pageForState(StateMachine state, pages::PageId &out)
+    {
+        switch (state)
+        {
+        case StateMachine::PREPARATION:
+        case StateMachine::FILLING_WATER:
+        case StateMachine::FIRING:
+        case StateMachine::HEATING:
+        case StateMachine::STEAMING:
+            out = pages::PageId::SensorDashboard;
+            return true;
+
+        case StateMachine::COMPLETED:
+        case StateMachine::FAILED:
+        case StateMachine::ERROR:
+            out = pages::PageId::SteamingSummaryPage;
+            return true;
+
+        case StateMachine::IDLE:
+        default:
+            return false; // leave the user wherever they are
+        }
+    }
 
     // The one place that maps a PageId to its concrete page object.
     // Adding a new page = one new case here + one new PageId enum value.
@@ -84,6 +111,7 @@ namespace page_manager
     {
         // pointer to global single tft
         tftPtr = &tft;
+        lastState = state_manager::get_state_machine();
 
         // Navigate to page by id
         navigateTo(pages::PageId::Menu);
@@ -96,10 +124,22 @@ namespace page_manager
             return;
         }
 
+        StateMachine state = state_manager::get_state_machine();
+        if (state != lastState)
+        {
+            lastState = state;
+            pages::PageId target;
+            bool is_correct_page = pageForState(state, target);
+            if (is_correct_page && target != currentPageId)
+            {
+                navigateTo(target);
+                return;
+            }
+        }
+
         long position = sensor_manager::getEncoderPosition();
         long delta = position - lastEncoderPosition;
         lastEncoderPosition = position;
-
         bool buttonPressed = sensor_manager::wasEncoderButtonPressed();
 
         currentPage->update(*tftPtr, delta, buttonPressed);
@@ -119,6 +159,7 @@ namespace page_manager
         sensor_manager::setEncoderPosition(0);
         lastEncoderPosition = 0;
 
+        currentPageId = id;
         currentPage = pageFor(id);
         currentPage->onEnter(*tftPtr);
     }
