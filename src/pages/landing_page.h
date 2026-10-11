@@ -11,8 +11,10 @@ namespace pages
         void update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed) override;
 
     private:
-        void drawButton(TFT_eSPI &tft, int index);
-        int selectedIndex_ = 0;
+        void drawPrompt(TFT_eSPI &tft, bool visible);
+
+        unsigned long lastBlinkMs_ = 0;
+        bool promptVisible_ = true;
     };
 
     extern LandingPage landing_page;
