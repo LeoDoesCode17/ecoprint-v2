@@ -4,6 +4,7 @@ namespace pages
 {
     enum class PageId
     {
+        Landing,
         Menu,
         Page1,
         Page2,
