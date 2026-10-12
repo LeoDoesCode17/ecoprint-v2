@@ -19,5 +19,6 @@ namespace pages
         constexpr uint16_t kTerracotta = rgb(204, 112, 70);
         constexpr uint16_t kOchre = rgb(214, 170, 80);
         constexpr uint16_t kCardIdle = rgb(30, 52, 40); // unselected card fill
+        constexpr uint16_t kBack = rgb(128, 0, 32);
     } // namespace theme
 } // namespace pages
