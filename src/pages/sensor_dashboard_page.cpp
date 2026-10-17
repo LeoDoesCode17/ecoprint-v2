@@ -16,13 +16,16 @@ namespace pages
     {
         const int title_y = 18;
 
-        const int first_row_y = 50;
-        const int row_height = 30;
+        // 8 rows now (lighter status added), so rows are packed a bit tighter
+        const int first_row_y = 42;
+        const int row_height = 27;
         const int row_text_h = 24;
 
-        const int back_button_y = 270;
-        const int back_button_height = 40;
-        const int back_button_margin_x = 100;
+        // Button row: [Lighter ON/OFF toggle] [Stop]
+        const int button_y = 268;
+        const int button_height = 40;
+        const int button_margin_x = 20;
+        const int button_gap = 10;
 
         unsigned long LAST_UPDATE_DEVICE_STATUS = millis();
         const unsigned long UPDATE_DEVICE_STATUS_INTERVAL_MS = 1990;
@@ -75,6 +78,7 @@ namespace pages
         int timerMinutes = sensor_manager::get_timer();
         _countdown_end_ms = millis() + static_cast<unsigned long>(timerMinutes) * 60000UL;
         _last_refresh_ms = 0;
+        _focus = static_cast<int>(Button::Stop);
 
         for (int i = 0; i < static_cast<int>(Field::Count); i++)
         {
@@ -92,34 +96,73 @@ namespace pages
             drawRow(tft, static_cast<Field>(i), true);
         }
 
-        tft.fillRoundRect(back_button_margin_x, back_button_y, tft.width() - 2 * back_button_margin_x, back_button_height, 8, TFT_RED);
-        tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, TFT_RED);
-        tft.setTextFont(4);
-        tft.drawString("Stop", tft.width() / 2, back_button_y + back_button_height / 2);
+        drawButtons(tft);
     }
 
     void SensorDashboardPage::onExit()
     {
         actuator_manager::turn_off_pump();
         actuator_manager::close_valve();
+        // The lighter can now be switched on by hand from this page, so make
+        // sure it is never left on after leaving the page.
+        actuator_manager::turn_off_lighter();
     }
 
     void SensorDashboardPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
-        // No focus to move, nothing to edit - the whole screen is read-only
-        // except Back, so any click just leaves.
+        // The encoder moves focus between the buttons; a click activates the
+        // focused one (Lighter toggle / Stop).
         // Put the update sensor, publish message, and control here
 
         // only publish data sensors and actuator when state_machine is not idle
         // ketika waktu sudah selesai maka publish stop command
 
+        if (encoderDelta != 0)
+        {
+            const int count = static_cast<int>(Button::Count);
+            const int previous = _focus;
+            _focus = ((_focus + static_cast<int>(encoderDelta)) % count + count) % count;
+
+            if (_focus != previous)
+            {
+                // Only the two buttons whose focus changed need a redraw
+                drawButton(tft, static_cast<Button>(previous));
+                drawButton(tft, static_cast<Button>(_focus));
+            }
+        }
+
         if (buttonPressed)
         {
-            page_manager::navigateTo(PageId::SteamingSummaryPage);
-            const ecoprint_command_t command_data = {.command = 1};
-            network_manager::publish_stop_message(command_data);
-            return;
+            switch (static_cast<Button>(_focus))
+            {
+            case Button::Lighter:
+                // One button toggles the lighter, so no knob rotation is
+                // needed to switch between on and off.
+                if (actuator_manager::is_lighter_on())
+                {
+                    Serial.println("[ACTUATOR] Turn off lighter");
+                    actuator_manager::turn_off_lighter();
+                }
+                else
+                {
+                    Serial.println("[ACTUATOR] Turn on lighter");
+                    actuator_manager::turn_on_lighter();
+                }
+                drawButton(tft, Button::Lighter); // only the text changes
+                drawRow(tft, Field::LighterStatus, false);
+                break;
+
+            case Button::Stop:
+            {
+                page_manager::navigateTo(PageId::SteamingSummaryPage);
+                const ecoprint_command_t command_data = {.command = 1};
+                network_manager::publish_stop_message(command_data);
+                return;
+            }
+
+            default:
+                break;
+            }
         }
 
         unsigned long now = millis();
@@ -136,6 +179,7 @@ namespace pages
                 // publish stop message to broker
                 const ecoprint_command_t command_data = {.command = 1};
                 network_manager::publish_stop_message(command_data);
+                return; // this page is no longer active - don't draw or control below
             }
         }
 
@@ -146,6 +190,12 @@ namespace pages
             for (int i = 0; i < static_cast<int>(Field::Count); i++)
             {
                 drawRow(tft, static_cast<Field>(i), false);
+            }
+
+            // Keep the button text correct if the lighter changed elsewhere
+            if (actuator_manager::is_lighter_on() != _lighter_drawn_on)
+            {
+                drawButton(tft, Button::Lighter);
             }
         }
 
@@ -294,6 +344,9 @@ namespace pages
         case Field::PumpStatus:
             snprintf(buffer, bufferSize, "%s", actuator_manager::is_pump_on() ? "On" : "Off");
             break;
+        case Field::LighterStatus:
+            snprintf(buffer, bufferSize, "%s", actuator_manager::is_lighter_on() ? "On" : "Off");
+            break;
         default:
             buffer[0] = '\0';
             break;
@@ -318,6 +371,8 @@ namespace pages
             return "Valve";
         case Field::PumpStatus:
             return "Pump";
+        case Field::LighterStatus:
+            return "Lighter";
         default:
             return "";
         }
@@ -326,5 +381,57 @@ namespace pages
     int SensorDashboardPage::rowY(Field field)
     {
         return first_row_y + static_cast<int>(field) * row_height;
+    }
+
+    const char *SensorDashboardPage::buttonLabel(Button button)
+    {
+        switch (button)
+        {
+        case Button::Lighter:
+            return actuator_manager::is_lighter_on() ? "Lighter ON" : "Lighter OFF";
+        case Button::Stop:
+            return "Stop";
+        default:
+            return "";
+        }
+    }
+
+    void SensorDashboardPage::drawButtons(TFT_eSPI &tft)
+    {
+        for (int i = 0; i < static_cast<int>(Button::Count); i++)
+        {
+            drawButton(tft, static_cast<Button>(i));
+        }
+    }
+
+    void SensorDashboardPage::drawButton(TFT_eSPI &tft, Button button)
+    {
+        const int count = static_cast<int>(Button::Count);
+        const int index = static_cast<int>(button);
+        const int button_width = (tft.width() - 2 * button_margin_x - (count - 1) * button_gap) / count;
+        const int x = button_margin_x + index * (button_width + button_gap);
+        const bool focused = (index == _focus);
+
+        // Each button has its own color when focused; unfocused ones are grey
+        const uint16_t accent = (button == Button::Lighter) ? TFT_BLUE : TFT_RED;
+        const uint16_t fill = focused ? accent : TFT_DARKGREY;
+
+        if (button == Button::Lighter)
+        {
+            _lighter_drawn_on = actuator_manager::is_lighter_on();
+        }
+
+        tft.fillRoundRect(x, button_y, button_width, button_height, 8, fill);
+        if (focused)
+        {
+            // White outline so it's obvious which button a click will hit
+            tft.drawRoundRect(x, button_y, button_width, button_height, 8, TFT_WHITE);
+            tft.drawRoundRect(x + 1, button_y + 1, button_width - 2, button_height - 2, 7, TFT_WHITE);
+        }
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_WHITE, fill);
+        tft.setTextFont(4);
+        tft.drawString(buttonLabel(button), x + button_width / 2, button_y + button_height / 2);
     }
 }
