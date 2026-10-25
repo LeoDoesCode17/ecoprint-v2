@@ -193,7 +193,7 @@ namespace pages
         sensor_manager::set_timer(_current_timer_minute_value);
         state_manager::set_state_machine(StateMachine::IDLE);
         const ecoprint_start_command_t start_command = {.setpoint = _current_temparture_celcius_value, .steaming_duration_minutes = _current_timer_minute_value};
-        network_manager::publish_start_message(start_command);
+        // network_manager::publish_start_message(start_command);
         page_manager::navigateTo(PageId::SensorDashboard);
     }
 
