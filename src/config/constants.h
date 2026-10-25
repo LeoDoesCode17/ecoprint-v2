@@ -8,7 +8,7 @@ namespace constant
     const char WIFI_SSID[] = "WIFI_SSID";
     const char WIFI_PASSWORD[] = "WIFI_PASSWORD";
     const char MQTT_BROKER_MDNS[] = "raspberrypi";
-    const char ECOPRINT_MQTT_HOST[] = "ecoprint.vpspenelitian.com";
+    const char ECOPRINT_MQTT_HOST[] = "broker.emqx.io";
     const int MQTT_PORT = 1883;
     const int RASPI_MQTT_PORT = 1884;
     const unsigned long MSG_BUFFER_SIZE = 100;
