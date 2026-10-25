@@ -1,5 +1,6 @@
 #pragma once
-#include <stdint.h>
+#include <Arduino.h>
+
 using mqtt_callback = void (*)(char *, uint8_t *, unsigned int);
 
 enum class EcoprintEvent : uint8_t
@@ -58,7 +59,49 @@ typedef struct
     int command;
 } ecoprint_command_t;
 
-typedef struct {
+typedef struct
+{
+    float water_temperature;
+    float air_temperature;
+    float humidity;
+    bool is_water_sufficient;
+    bool is_fire_on;
+} sensor_t;
+
+typedef struct
+{
+    int valve_degree;
+    bool is_valve_open;
+    bool is_max_valve_opening;
+    bool is_pump_on;
+    bool is_lighter_on;
+} actuator_t;
+
+typedef struct
+{
+    StateMachine state_machine;
+} device_status_t;
+
+typedef struct
+{
     int setpoint;
     int steaming_duration_minutes;
 } ecoprint_start_command_t;
+
+enum class msg_type_t : uint8_t
+{
+    SENSOR,
+    ACTUATOR,
+    DEVICE_STATUS,
+};
+
+typedef struct
+{
+    msg_type_t type;
+    union
+    {
+        sensor_t sensor;
+        actuator_t actuator;
+        device_status_t device_status;
+    };
+} outbound_msg_t;
