@@ -101,7 +101,9 @@ namespace mqtt
     }
     bool publish_message(const char *topic, const char *payload)
     {
-        return mqtt_client.publish(topic, payload);
+        bool is_published = mqtt_client.publish(topic, payload);
+        Serial.printf("[MQTT] %s %s -> %s\n", is_published ? "published" : "FAILED", topic, payload);
+        return is_published;
     }
     void subscribe_to_topic(const char *topic)
     {
