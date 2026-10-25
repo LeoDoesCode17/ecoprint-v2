@@ -84,12 +84,21 @@ namespace
 
     static void read_esp32_mac_address()
     {
-        wifi::copy_mac_address(mac, sizeof(mac));
+        uint64_t mac_result = ESP.getEfuseMac();
+        uint8_t _mac[6];
+        _mac[0] = (mac_result >> 0) & 0xFF;
+        _mac[1] = (mac_result >> 8) & 0xFF;
+        _mac[2] = (mac_result >> 16) & 0xFF;
+        _mac[3] = (mac_result >> 24) & 0xFF;
+        _mac[4] = (mac_result >> 32) & 0xFF;
+        _mac[5] = (mac_result >> 40) & 0xFF;
+        snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 _mac[0], _mac[1], _mac[2], _mac[3], _mac[4], _mac[5]);
         Serial.print("[WIFI] ESP32 MAC address is: ");
         Serial.println(mac);
     }
-
-    static void build_sensors_publish_topic()
+    
+    static void build_publish_topics()
     {
         snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry/sensor", mac);
         snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
@@ -111,7 +120,7 @@ namespace
         Serial.println(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC);
     }
 
-    static void build_subscribe_topic()
+    static void build_subscribe_topics()
     {
         snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         Serial.print("[MQTT] Start subscribe topic: ");
@@ -173,12 +182,12 @@ namespace network_manager
 {
     void initialize()
     {
-        wifi::connect_or_reconnect();
-        read_esp32_mac_address();
-        build_sensors_publish_topic();
-        build_subscribe_topic();
-
-        mqtt::initialize();
+        read_esp32_mac_address(); // non blocking
+        build_publish_topics(); // non blocking
+        build_subscribe_topics(); // non blocking
+        
+        wifi::connect_or_reconnect(); // Blocking
+        mqtt::initialize(); 
         mqtt::set_callback(on_mqtt_message_callback);
 
         // Ensure active MQTT connection BEFORE subscribing to topics
