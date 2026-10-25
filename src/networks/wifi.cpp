@@ -32,4 +32,10 @@ namespace wifi
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
     }
+
+    bool is_connected()
+    {
+        return WiFi.status() == WL_CONNECTED;
+    }
+
 }
