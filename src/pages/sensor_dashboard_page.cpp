@@ -171,8 +171,9 @@ namespace pages
             case Button::Stop:
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
-                const ecoprint_command_t command_data = {.command = 1};
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
                 // network_manager::publish_stop_message(command_data);
+                queue_manager::enqueue_command_data(stop_command);
                 return;
             }
 
@@ -193,8 +194,9 @@ namespace pages
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
                 // publish stop message to broker
-                const ecoprint_command_t command_data = {.command = 1};
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
                 // network_manager::publish_stop_message(command_data);
+                queue_manager::enqueue_command_data(stop_command);
                 return; // this page is no longer active - don't draw or control below
             }
         }
