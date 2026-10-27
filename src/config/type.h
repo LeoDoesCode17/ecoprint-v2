@@ -9,6 +9,19 @@ enum class EcoprintEvent : uint8_t
     STEAMING = 1,
 };
 
+enum class command_source_t : uint8_t
+{
+    LOCAL,
+    REMOTE
+};
+
+enum class reject_reason_t : uint8_t
+{
+    ALREADY_RUNNING,
+    DEVICE_ERROR,
+    INVALID_VALUE,
+};
+
 typedef struct ecoprint_sensor_t
 {
     float water_temperature;
@@ -57,6 +70,14 @@ typedef struct
 typedef struct
 {
     int command;
+    int setpoint;
+    int timer_minutes;
+    command_source_t source;
+} command_t;
+
+typedef struct
+{
+    int command;
 } ecoprint_command_t;
 
 typedef struct
@@ -79,6 +100,13 @@ typedef struct
 
 typedef struct
 {
+    command_t command; // the command that was rejected
+    reject_reason_t reason;
+    StateMachine state; // device state machine at the rejection time
+} command_rejected_t;
+
+typedef struct
+{
     StateMachine state_machine;
 } device_status_t;
 
@@ -93,6 +121,8 @@ enum class msg_type_t : uint8_t
     SENSOR,
     ACTUATOR,
     DEVICE_STATUS,
+    COMMAND_EVENT,
+    COMMAND_REJECTED,
 };
 
 typedef struct
@@ -103,5 +133,7 @@ typedef struct
         sensor_t sensor;
         actuator_t actuator;
         device_status_t device_status;
+        command_t command_event;
+        command_rejected_t command_rejected;
     };
 } outbound_msg_t;
