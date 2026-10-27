@@ -66,6 +66,22 @@ void mainManagementTask(void *pvParameters)
   }
 }
 
+void commandReactTask(void *pv)
+{
+  command_t command_data;
+  for (;;)
+  {
+    if (queue_manager::dequeue_command_data(command_data, portMAX_DELAY))
+    {
+      Serial.printf("[CORE-%d] (command, temp_c, timer_min, source) = (%d, %d, %d, %s)\n",
+                    xPortGetCoreID(), command_data.command,
+                    command_data.setpoint, command_data.timer_minutes,
+                    command_data.source == command_source_t::LOCAL ? "LOCAL" : "REMOTE");
+      state_manager::handle_command(command_data);
+    }
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -78,33 +94,10 @@ void setup()
   page_manager::initialize(tft);
   queue_manager::initialize();
 
-  xTaskCreatePinnedToCore(
-      networkManagementTask, // Task Code (function)
-      "NetworkTask",         // Task name
-      4096,                  // stack depth
-      NULL,                  // pvParameters
-      1,                     // Task priority (matter for all tasks in the same core),
-      NULL,                  // pv created task
-      0                      // core ID
-  );
-
-  xTaskCreatePinnedToCore(
-      mainManagementTask,
-      "MainTask",
-      4096,
-      NULL,
-      1,
-      NULL,
-      1);
-
-  xTaskCreatePinnedToCore(
-      publishDeviceStatusTask,
-      "PublishDeviceStatusTask",
-      4096,
-      NULL,
-      1,
-      NULL,
-      1);
+  xTaskCreatePinnedToCore(networkManagementTask, "NetworkTask", 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(mainManagementTask, "MainTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(publishDeviceStatusTask, "PublishDeviceStatusTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(commandReactTask, "CommandReactTask", 4096, NULL, 1, NULL, 1);
 }
 
 void loop()
