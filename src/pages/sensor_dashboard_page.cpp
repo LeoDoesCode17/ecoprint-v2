@@ -6,6 +6,7 @@
 #include "managers/sensor_manager.h"
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
+#include "managers/queue_manager.h"
 #include "config/constants.h"
 
 namespace pages
@@ -50,6 +51,9 @@ namespace pages
 
         ecoprint_sensor_t sensor_data;
         ecoprint_actuator_t previous_actuator_data, actuator_data;
+
+        sensor_t _outbound_sensor_data;
+        actuator_t _outbound_actuator_data;
         unsigned long timer_second;
 
         bool is_steaming = false;
@@ -66,12 +70,24 @@ namespace pages
         sensor_data.is_water_sufficient = true;
         sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
+        _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
+        _outbound_sensor_data.air_temperature = sensor_data.air_temperature;
+        _outbound_sensor_data.humidity = sensor_data.humidity;
+        _outbound_sensor_data.is_fire_on = sensor_data.water_temperature;
+        _outbound_sensor_data.is_water_sufficient = sensor_data.water_temperature;
+
         actuator_data.is_lighter_on = actuator_manager::is_lighter_on();
         actuator_data.is_max_valve_opening = actuator_manager::is_valve_max_opening();
         actuator_data.is_pump_on = actuator_manager::is_pump_on();
         actuator_data.is_valve_open = actuator_manager::is_valve_open();
         actuator_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
         actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
+
+        _outbound_actuator_data.is_lighter_on = actuator_data.is_lighter_on;
+        _outbound_actuator_data.is_max_valve_opening = actuator_data.is_max_valve_opening;
+        _outbound_actuator_data.is_pump_on = actuator_data.is_pump_on;
+        _outbound_actuator_data.is_valve_open = actuator_data.is_valve_open;
+        _outbound_actuator_data.valve_degree = actuator_data.valve_degree;
 
         timer_second = sensor_manager::get_timer() * 60;
 
@@ -155,8 +171,9 @@ namespace pages
             case Button::Stop:
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
-                const ecoprint_command_t command_data = {.command = 1};
-                network_manager::publish_stop_message(command_data);
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
+                // network_manager::publish_stop_message(command_data);
+                queue_manager::enqueue_command_data(stop_command);
                 return;
             }
 
@@ -177,8 +194,9 @@ namespace pages
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
                 // publish stop message to broker
-                const ecoprint_command_t command_data = {.command = 1};
-                network_manager::publish_stop_message(command_data);
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
+                // network_manager::publish_stop_message(command_data);
+                queue_manager::enqueue_command_data(stop_command);
                 return; // this page is no longer active - don't draw or control below
             }
         }
@@ -209,6 +227,12 @@ namespace pages
             sensor_data.is_fire_on = true;
             sensor_data.is_water_sufficient = true;
 
+            _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
+            _outbound_sensor_data.air_temperature = sensor_data.air_temperature;
+            _outbound_sensor_data.humidity = sensor_data.humidity;
+            _outbound_sensor_data.is_fire_on = sensor_data.water_temperature;
+            _outbound_sensor_data.is_water_sufficient = sensor_data.water_temperature;
+
             if (!is_steaming)
             {
                 if (sensor_data.water_temperature >= sensor_data.setpoint)
@@ -237,6 +261,12 @@ namespace pages
             actuator_data.is_valve_open = actuator_manager::is_valve_open();
             actuator_data.valve_degree = actuator_manager::get_current_valve_degree();
 
+            _outbound_actuator_data.is_lighter_on = actuator_data.is_lighter_on;
+            _outbound_actuator_data.is_max_valve_opening = actuator_data.is_max_valve_opening;
+            _outbound_actuator_data.is_pump_on = actuator_data.is_pump_on;
+            _outbound_actuator_data.is_valve_open = actuator_data.is_valve_open;
+            _outbound_actuator_data.valve_degree = actuator_data.valve_degree;
+
             // compare current and previous
             const bool is_different = (previous_actuator_data.is_lighter_on != actuator_data.is_lighter_on) ||
                                       (previous_actuator_data.is_max_valve_opening != actuator_data.is_max_valve_opening) ||
@@ -246,17 +276,19 @@ namespace pages
 
             if (is_different)
             {
-                network_manager::publish_actuator_data(actuator_data);
+                // network_manager::publish_actuator_data(actuator_data);
             }
         }
 
         if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
-            network_manager::publish_sensor_data(sensor_data);
+            // network_manager::publish_sensor_data(sensor_data);
+            queue_manager::enqueue_sensor_data(_outbound_sensor_data);
 
             // for data collecting
-            network_manager::publish_actuator_data(actuator_data);
+            // network_manager::publish_actuator_data(actuator_data);
+            queue_manager::enqueue_actuator_data(_outbound_actuator_data);
         }
 
         if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)

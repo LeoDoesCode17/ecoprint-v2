@@ -1,4 +1,5 @@
 #pragma once
+#include <Arduino.h>
 namespace constant
 {
     const unsigned int ZERO_PERCENT_DEGREE = 0;
@@ -8,7 +9,12 @@ namespace constant
     const char WIFI_SSID[] = "WIFI_SSID";
     const char WIFI_PASSWORD[] = "WIFI_PASSWORD";
     const char MQTT_BROKER_MDNS[] = "raspberrypi";
-    const char ECOPRINT_MQTT_HOST[] = "ecoprint.vpspenelitian.com";
+    const char ECOPRINT_MQTT_HOST[] = "broker.mqtt.cool";
+    // const char ECOPRINT_MQTT_HOST[] = "broker.emqx.io";
+    const uint8_t MIN_SETPOINT_CELCIUS = 50;
+    const uint8_t MAX_SETPOINT_CELCIUS = 100;
+    const uint8_t MIN_TIMER_MINUTE = 1;
+    const uint8_t MAX_TIMER_MINUTE = 120;
     const int MQTT_PORT = 1883;
     const int RASPI_MQTT_PORT = 1884;
     const unsigned long MSG_BUFFER_SIZE = 100;

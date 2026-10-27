@@ -13,4 +13,6 @@ namespace network_manager {
     long get_message_seq_id(int index);
     void reset_message_seq_id();
     void publish_start_message(ecoprint_start_command_t start_command_data);
+    bool is_connected();
+    bool publish(const outbound_msg_t &msg);
 }

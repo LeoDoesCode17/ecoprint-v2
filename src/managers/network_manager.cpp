@@ -8,6 +8,7 @@
 #include "actuator_manager.h"
 #include "state_manager.h"
 #include "sensor_manager.h"
+#include "queue_manager.h"
 
 namespace
 {
@@ -15,6 +16,7 @@ namespace
     static const int ACTUATOR_MESSAGE_BUFFER_SIZE = 256;
     static const int STATUS_MESSAGE_BUFFER_SIZE = 128;
     static const int COMMAND_MESSAGE_BUFFER_SIZE = 256;
+    static const int OUTBOUND_MESSAGE_BUFFER_SIZE = 256;
     static const int ISO8601_BUFFER_SIZE = 26;
     constexpr size_t _TOPIC_BUF_SIZE = 64;
     static char mac[constant::MAC_BUF_SIZE];
@@ -26,6 +28,9 @@ namespace
     static char ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_PUBLISH_EVENT_TOPIC[_TOPIC_BUF_SIZE];
+    static char ECOPRINT_SUBSCRIBE_COMMAND_TOPIC[_TOPIC_BUF_SIZE];
 
     // Sequence IDs for packet loss tracking
     static unsigned long sensor_message_seq_id = 0;
@@ -84,12 +89,21 @@ namespace
 
     static void read_esp32_mac_address()
     {
-        wifi::copy_mac_address(mac, sizeof(mac));
+        uint64_t mac_result = ESP.getEfuseMac();
+        uint8_t _mac[6];
+        _mac[0] = (mac_result >> 0) & 0xFF;
+        _mac[1] = (mac_result >> 8) & 0xFF;
+        _mac[2] = (mac_result >> 16) & 0xFF;
+        _mac[3] = (mac_result >> 24) & 0xFF;
+        _mac[4] = (mac_result >> 32) & 0xFF;
+        _mac[5] = (mac_result >> 40) & 0xFF;
+        snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 _mac[0], _mac[1], _mac[2], _mac[3], _mac[4], _mac[5]);
         Serial.print("[WIFI] ESP32 MAC address is: ");
         Serial.println(mac);
     }
 
-    static void build_sensors_publish_topic()
+    static void build_publish_topics()
     {
         snprintf(ECOPRINT_PUBLISH_SENSORS_TOPIC, sizeof(ECOPRINT_PUBLISH_SENSORS_TOPIC), "esp/%s/telemetry/sensor", mac);
         snprintf(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, sizeof(ECOPRINT_PUBLISH_ACTUATORS_TOPIC), "esp/%s/telemetry/actuator", mac);
@@ -97,6 +111,7 @@ namespace
         snprintf(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC), "esp/%s/command/stop", mac);
         snprintf(ECOPRINT_PUBLISH_START_COMMAND_TOPIC, sizeof(ECOPRINT_PUBLISH_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         snprintf(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC, sizeof(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC), "esp/%s/telemetry/status", mac);
+        snprintf(ECOPRINT_PUBLISH_EVENT_TOPIC, sizeof(ECOPRINT_PUBLISH_EVENT_TOPIC), "esp/%s/event", mac);
         Serial.print("[MQTT] Sensors publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_SENSORS_TOPIC);
         Serial.print("[MQTT] Actuators publish topic: ");
@@ -109,9 +124,11 @@ namespace
         Serial.println(ECOPRINT_PUBLISH_START_COMMAND_TOPIC);
         Serial.print("[MQTT] Telemetry status device publish topic: ");
         Serial.println(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC);
+        Serial.print("[MQTT] Event publish topic: ");
+        Serial.println(ECOPRINT_PUBLISH_EVENT_TOPIC);
     }
 
-    static void build_subscribe_topic()
+    static void build_subscribe_topics()
     {
         snprintf(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC), "esp/%s/command/start", mac);
         Serial.print("[MQTT] Start subscribe topic: ");
@@ -121,13 +138,36 @@ namespace
                  "esp/%s/command/stop", mac);
         Serial.print("[MQTT] Start subscribe topic: ");
         Serial.println(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
+
+        // Special topic that esp32 will subscribe and publish to :
+        snprintf(ECOPRINT_COMMAND_TOPIC, sizeof(ECOPRINT_COMMAND_TOPIC), "esp/%s/command", mac);
+        Serial.print("[MQTT] Start subscribe special command topic: ");
+        Serial.println(ECOPRINT_COMMAND_TOPIC);
+
+        snprintf(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC, sizeof(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC), "esp/%s/command", mac);
+        Serial.print("[MQTT] Start subscribe command topic: ");
+        Serial.println(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
+    }
+
+    static const char *reason_str(reject_reason_t r)
+    {
+        switch (r)
+        {
+        case reject_reason_t::ALREADY_RUNNING:
+            return "already_running";
+        case reject_reason_t::DEVICE_ERROR:
+            return "device_error";
+        case reject_reason_t::INVALID_VALUE:
+            return "invalid_value";
+        }
+        return "unknown";
     }
 
     static void on_mqtt_message_callback(char *topic, byte *payload, unsigned int length)
     {
         Serial.printf("[MQTT] Message arrived on [%s]\n", topic);
 
-        StaticJsonDocument<256> doc;
+        StaticJsonDocument<COMMAND_MESSAGE_BUFFER_SIZE> doc;
         DeserializationError err = deserializeJson(doc, payload, length);
         if (err)
         {
@@ -135,7 +175,38 @@ namespace
             return;
         }
 
-        if (strcmp(topic, ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC) == 0)
+        if (strcmp(topic, ECOPRINT_SUBSCRIBE_COMMAND_TOPIC) == 0)
+        {
+            command_t command_data;
+            Serial.println("[MQTT] Received command message");
+            command_data.setpoint = doc["setpoint"] | -1;
+            command_data.timer_minutes = doc["timer_minutes"] | -1;
+            command_data.command = doc["command"] | -1;
+            command_data.source = command_source_t::REMOTE;
+
+            switch (command_data.command)
+            {
+            case 0:
+                Serial.println("[MQTT] Receive command to stop steaming");
+                if (!queue_manager::enqueue_command_data(command_data))
+                {
+                    Serial.println("[MQTT] Command queue full, command dropped");
+                }
+                break;
+            case 1:
+                Serial.println("[MQTT] Receive command to start steaming");
+                if (!queue_manager::enqueue_command_data(command_data))
+                {
+                    Serial.println("[MQTT] Command queue full, command dropped");
+                }
+                break;
+            default:
+                Serial.println("[MQTT] Receive unknown command");
+                break;
+            }
+        }
+
+        else if (strcmp(topic, ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC) == 0)
         {
             Serial.println("[MQTT] Received message to start steaming");
             const int setpoint = doc["setpoint"] | -1;
@@ -151,7 +222,7 @@ namespace
             state_manager::set_state_machine(StateMachine::PREPARATION);
         }
 
-        if (strcmp(topic, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC) == 0)
+        else if (strcmp(topic, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC) == 0)
         {
             Serial.println("[MQTT] Received message to stop steaming");
             const int command = doc["command"] | -1;
@@ -166,6 +237,10 @@ namespace
                 Serial.printf("[MQTT] Undefined command %d\n", command);
             }
         }
+        else
+        {
+            return;
+        }
     }
 }
 
@@ -173,11 +248,15 @@ namespace network_manager
 {
     void initialize()
     {
-        wifi::connect_or_reconnect();
-        read_esp32_mac_address();
-        build_sensors_publish_topic();
-        build_subscribe_topic();
+        sensor_message_seq_id = 0;
+        actuator_message_seq_id = 0;
+        device_status_message_seq_id = 0;
 
+        read_esp32_mac_address(); // non blocking
+        build_publish_topics();   // non blocking
+        build_subscribe_topics(); // non blocking
+
+        wifi::connect_or_reconnect(); // Blocking
         mqtt::initialize();
         mqtt::set_callback(on_mqtt_message_callback);
 
@@ -185,6 +264,7 @@ namespace network_manager
         mqtt::connect_or_reconnect();
         mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
         mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
+        mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
 
         init_time();
     }
@@ -199,6 +279,7 @@ namespace network_manager
             // Resubscribe to dynamic macro topic upon reconnection
             mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_START_COMMAND_TOPIC);
             mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_STOP_COMMAND_TOPIC);
+            mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
         }
     }
 
@@ -415,5 +496,119 @@ namespace network_manager
         {
             Serial.printf("[MQTT]: FAIL TO PUBLISH %s TO TOPIC %s\n", payload, ECOPRINT_PUBLISH_STOP_COMMAND_TOPIC);
         }
+    }
+
+    bool is_connected()
+    {
+        return wifi::is_connected() && mqtt::is_connected();
+    }
+
+    bool publish(const outbound_msg_t &msg)
+    {
+        if (!mqtt::is_connected())
+        {
+            Serial.printf("[MQTT] Failed to publish outbound message type %d\n", static_cast<int>(msg.type));
+            return false;
+        }
+
+        char recorded_at[ISO8601_BUFFER_SIZE];
+        if (!get_iso8601_utc(recorded_at, sizeof(recorded_at)))
+        {
+            strcpy(recorded_at, "1970-01-01T00:00:00Z");
+        }
+
+        StaticJsonDocument<OUTBOUND_MESSAGE_BUFFER_SIZE> doc;
+
+        switch (msg.type)
+        {
+        case msg_type_t::SENSOR:
+        {
+            doc["water_temperature"] = msg.sensor.water_temperature;
+            doc["air_temperature"] = msg.sensor.air_temperature;
+            doc["humidity"] = msg.sensor.humidity;
+            doc["is_water_sufficient"] = msg.sensor.is_water_sufficient;
+            doc["recorded_at"] = recorded_at;
+            // doc["setpoint"] = msg.sensor.setpoint_temperature;
+            doc["is_fire_on"] = msg.sensor.is_fire_on;
+
+            sensor_message_seq_id++;
+            doc["seq_id"] = sensor_message_seq_id;
+
+            char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
+            serializeJson(doc, payload);
+
+            bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_SENSORS_TOPIC, payload);
+            return is_published;
+        }
+        case msg_type_t::ACTUATOR:
+        {
+            doc["valve_degree"] = msg.actuator.valve_degree;
+            doc["is_valve_open"] = msg.actuator.is_valve_open;
+            doc["is_max_valve_opening"] = msg.actuator.is_max_valve_opening;
+            doc["is_pump_on"] = msg.actuator.is_pump_on;
+            doc["is_lighter_on"] = msg.actuator.is_lighter_on;
+            // doc["setpoint"] = msg.actuator.setpoint;
+            doc["recorded_at"] = recorded_at;
+
+            actuator_message_seq_id++;
+            doc["seq_id"] = actuator_message_seq_id;
+
+            char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
+            serializeJson(doc, payload);
+
+            bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_ACTUATORS_TOPIC, payload);
+            return is_published;
+        }
+        case msg_type_t::DEVICE_STATUS:
+        {
+            // doc["is_active"] = is_active;
+            doc["state_machine"] = static_cast<int>(msg.device_status.state_machine);
+            doc["recorded_at"] = recorded_at;
+
+            device_status_message_seq_id++;
+            doc["seq_id"] = device_status_message_seq_id;
+
+            char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
+            serializeJson(doc, payload);
+
+            bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_DEVICE_STATUS_TOPIC, payload);
+            return is_published;
+        }
+        case msg_type_t::COMMAND_EVENT:
+        {
+            doc["recorded_at"] = recorded_at;
+            doc["event"] = msg.command_event.command == 1 ? "run_started" : "run_finished";
+            doc["source"] = msg.command_event.source == command_source_t::LOCAL ? "local" : "remote";
+            doc["setpoint"] = msg.command_event.setpoint;
+            doc["timer_minutes"] = msg.command_event.timer_minutes;
+
+            char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
+            serializeJson(doc, payload);
+
+            bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_EVENT_TOPIC, payload);
+            return is_published;
+        }
+        case msg_type_t::COMMAND_REJECTED:
+        {
+            doc["recorded_at"] = recorded_at;
+            doc["event"] = "command_rejected";
+            doc["setpoint"] = msg.command_rejected.command.setpoint;
+            doc["timer_minutes"] = msg.command_rejected.command.timer_minutes;
+            doc["reason"] = reason_str(msg.command_rejected.reason);
+            doc["state"] = static_cast<int>(msg.command_rejected.state);
+            doc["source"] = "remote";
+            doc["command"] = msg.command_rejected.command.command;
+
+            char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
+            serializeJson(doc, payload);
+
+            bool is_published = mqtt::publish_message(ECOPRINT_PUBLISH_EVENT_TOPIC, payload);
+            return is_published;
+        }
+        default:
+            break;
+        }
+
+        return false;
     }
 }

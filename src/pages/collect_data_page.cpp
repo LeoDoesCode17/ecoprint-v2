@@ -4,7 +4,7 @@
 #include "managers/page_manager.h"
 #include "managers/sensor_manager.h"
 #include "managers/state_manager.h"
-#include "managers/network_manager.h"
+#include "managers/queue_manager.h"
 
 namespace pages
 {
@@ -192,8 +192,8 @@ namespace pages
         sensor_manager::set_setpoint_temperature((float)_current_temparture_celcius_value);
         sensor_manager::set_timer(_current_timer_minute_value);
         state_manager::set_state_machine(StateMachine::IDLE);
-        const ecoprint_start_command_t start_command = {.setpoint = _current_temparture_celcius_value, .steaming_duration_minutes = _current_timer_minute_value};
-        network_manager::publish_start_message(start_command);
+        const command_t start_command = {.command = 1, .setpoint = _current_temparture_celcius_value, .timer_minutes = _current_timer_minute_value, .source=command_source_t::LOCAL};
+        queue_manager::enqueue_command_data(start_command);
         page_manager::navigateTo(PageId::SensorDashboard);
     }
 

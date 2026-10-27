@@ -6,6 +6,7 @@
 #include "managers/network_manager.h"
 #include "managers/page_manager.h"
 #include "managers/state_manager.h"
+#include "managers/queue_manager.h"
 #include "config/constants.h"
 #include "config/type.h"
 
@@ -19,6 +20,68 @@ namespace
 
 } // namespace
 
+void networkManagementTask(void *pvParameters)
+{
+  Serial.printf("[RTOS] Core %d - Network Management Task Started.\n", xPortGetCoreID());
+  outbound_msg_t msg;
+  network_manager::initialize(); // Handles WiFi + MQTT connection + Subscriptions
+  for (;;)
+  {
+    network_manager::conect_or_reconnect();
+    network_manager::mqtt_loop();
+    if (network_manager::is_connected())
+    {
+      if (queue_manager::dequeque_outbound(msg, pdMS_TO_TICKS(20)))
+      {
+        // publish outbound message
+        network_manager::publish(msg);
+      }
+    }
+  }
+}
+
+void publishDeviceStatusTask(void *pv)
+{
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xPeriod = pdMS_TO_TICKS(10000);
+  device_status_t device_status = {.state_machine = StateMachine::IDLE};
+  Serial.printf("[RTOS] Core %d - publish device status task started.\n", xPortGetCoreID());
+  for (;;)
+  {
+    queue_manager::enqueue_device_status_data(device_status);
+    vTaskDelayUntil(&xLastWakeTime, xPeriod);
+  }
+}
+
+void mainManagementTask(void *pvParameters)
+{
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xPeriod = pdMS_TO_TICKS(10);
+
+  Serial.printf("[RTOS] Core %d - Main Management Task Started.\n", xPortGetCoreID());
+  for (;;)
+  {
+    page_manager::update();
+    vTaskDelayUntil(&xLastWakeTime, xPeriod);
+  }
+}
+
+void commandReactTask(void *pv)
+{
+  command_t command_data;
+  for (;;)
+  {
+    if (queue_manager::dequeue_command_data(command_data, portMAX_DELAY))
+    {
+      Serial.printf("[CORE-%d] (command, temp_c, timer_min, source) = (%d, %d, %d, %s)\n",
+                    xPortGetCoreID(), command_data.command,
+                    command_data.setpoint, command_data.timer_minutes,
+                    command_data.source == command_source_t::LOCAL ? "LOCAL" : "REMOTE");
+      state_manager::handle_command(command_data);
+    }
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -27,30 +90,17 @@ void setup()
   tft.fillScreen(TFT_BLACK);
 
   actuator_manager::initialize();
-  network_manager::initialize(); // Handles WiFi + MQTT connection + Subscriptions
   sensor_manager::initialize();
   page_manager::initialize(tft);
+  queue_manager::initialize();
+
+  xTaskCreatePinnedToCore(networkManagementTask, "NetworkTask", 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(mainManagementTask, "MainTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(publishDeviceStatusTask, "PublishDeviceStatusTask", 4096, NULL, 1, NULL, 1);
+  xTaskCreatePinnedToCore(commandReactTask, "CommandReactTask", 4096, NULL, 1, NULL, 1);
 }
 
 void loop()
 {
-  // MUST RUN EVERY ITERATION to handle incoming MQTT packets
-  network_manager::conect_or_reconnect();
-  network_manager::mqtt_loop();
-
-  // Periodic display and sensor publishing
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - last_main_loop >= constant::MAIN_LOOP_INTERVAL_MS)
-  {
-    page_manager::update();
-    last_main_loop = currentMillis;
-  }
-
-  if (currentMillis - last_publish_device_status >= constant::PUBLISH_DEVICE_STATUS_INTERVAL_MS)
-  {
-    global_device_status.state_machine = state_manager::get_state_machine();
-    network_manager::publish_device_status(global_device_status);
-    last_publish_device_status = currentMillis;
-  }
+  vTaskDelete(NULL);
 }
