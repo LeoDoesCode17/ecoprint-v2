@@ -20,7 +20,7 @@ namespace pages
         // Add/remove entries here to change the number of menu cards.
         const MenuItem items[] = {
             // {"Live Reading", PageId::Page1},
-            {"Start Steaming", PageId::Landing},
+            {"Start Steaming", PageId::CollectData},
             {"Test Actuator", PageId::TestActuator},
             {"Modify Servo", PageId::ModifyServo},
             {"Collect Data", PageId::CollectData},

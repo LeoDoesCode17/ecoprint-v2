@@ -17,6 +17,7 @@ namespace pages
         };
 
         const SettingItem items[] = {
+            {"Network", PageId::NetworkConfiguration},
             {"Sensor Calibration", PageId::SensorCalibration},
             {"Process Calibration", PageId::ProcessCalibration},
             {"Test Sensor", PageId::TestSensorList},
@@ -67,7 +68,7 @@ namespace pages
         tft.setTextFont(4);
         tft.setTextSize(1);
         tft.setTextColor(t::kCream, t::kBg);
-        tft.drawString("Main Menu", cx, kTitleY);
+        tft.drawString("Setting", cx, kTitleY);
 
         tft.drawFastHLine(cx - 70, kDividerY, 60, t::kSage);
         tft.drawFastHLine(cx + 10, kDividerY, 60, t::kSage);

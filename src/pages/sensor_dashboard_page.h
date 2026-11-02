@@ -4,9 +4,10 @@
 
 namespace pages
 {
-    // Read-only dashboard with two buttons: a Lighter toggle (its text
-    // switches between "Lighter ON" and "Lighter OFF") and Stop. The
-    // encoder moves focus between the buttons and a click activates the
+    // Read-only dashboard shown as a grid of stat cards (timer, temperatures,
+    // humidity, valve, pump, lighter), plus two buttons: a Lighter toggle
+    // (its text switches between "Lighter ON" and "Lighter OFF") and Stop.
+    // The encoder moves focus between the buttons and a click activates the
     // focused one. No edit mode is needed because none of the buttons has
     // a value to edit.
     class SensorDashboardPage : public IPage
@@ -37,10 +38,10 @@ namespace pages
             Count // not a real button - used only to size loops
         };
 
-        void drawRow(TFT_eSPI &tft, Field field, bool force);
+        void drawStat(TFT_eSPI &tft, Field field, bool force);
         void formatValue(Field field, char *buffer, size_t bufferSize) const;
         static const char *labelFor(Field field);
-        static int rowY(Field field);
+        static uint16_t valueColorFor(Field field, const char *text);
 
         void drawButtons(TFT_eSPI &tft);
         void drawButton(TFT_eSPI &tft, Button button);
@@ -57,9 +58,9 @@ namespace pages
         // is only redrawn when the state actually changes.
         bool _lighter_drawn_on = false;
 
-        // Caches the last text drawn for each row, so a row is only
+        // Caches the last text drawn for each stat card, so a card is only
         // redrawn when its value actually changed (avoids flicker across
-        // seven rows redrawing every tick for no reason).
+        // eight cards redrawing every tick for no reason).
         char _last_text[static_cast<int>(Field::Count)][32];
     };
 

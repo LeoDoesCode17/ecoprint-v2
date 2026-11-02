@@ -22,6 +22,9 @@
 #include "pages/test_ir_flame_page.h"
 #include "pages/test_float_switch_page.h"
 #include "pages/landing_page.h"
+#include "pages/network_configuration_page.h"
+#include "pages/wifi_configuration_page.h"
+#include "pages/mqtt_configuration_page.h"
 
 namespace
 {
@@ -103,6 +106,12 @@ namespace
             return &pages::test_float_switch_page;
         case pages::PageId::Landing:
             return &pages::landing_page;
+        case pages::PageId::NetworkConfiguration:
+            return &pages::networkConfigurationPage;
+        case pages::PageId::WifiConfiguration:
+            return &pages::wifiConfigurationPage;
+        case pages::PageId::MqttConfiguration:
+            return &pages::mqttConfigurationPage;
         }
         return &pages::landing_page;
     }
