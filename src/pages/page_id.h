@@ -23,6 +23,9 @@ namespace pages
         TestThermocouple,
         TestSht,
         TestFloatSwitch,
-        TestIrFlame
+        TestIrFlame,
+        NetworkConfiguration,
+        WifiConfiguration,
+        MqttConfiguration,
     };
 }
