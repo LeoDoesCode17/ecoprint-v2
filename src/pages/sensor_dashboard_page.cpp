@@ -8,25 +8,46 @@
 #include "managers/network_manager.h"
 #include "managers/queue_manager.h"
 #include "config/constants.h"
+#include "theme.h"
 
 namespace pages
 {
     SensorDashboardPage sensor_dashboard_page;
+    namespace t = theme;
 
     namespace
     {
-        const int title_y = 18;
+        // Layout (designed for 480x320) - theme and card style shared with
+        // the other pages (see theme.h)
+        constexpr int kTitleY = 22;
+        constexpr int kDividerY = 44;
+        constexpr int kCardRadius = 12;
 
-        // 8 rows now (lighter status added), so rows are packed a bit tighter
-        const int first_row_y = 42;
-        const int row_height = 27;
-        const int row_text_h = 24;
+        // Stat cards: a kStatCols x kStatRows grid of read-only cards
+        constexpr int kStatCols = 4;
+        constexpr int kStatRows = 2;
+        constexpr int kGridMarginX = 16;
+        constexpr int kGridTop = 58;
+        constexpr int kStatH = 84;
+        constexpr int kStatGap = 8;
 
         // Button row: [Lighter ON/OFF toggle] [Stop]
-        const int button_y = 268;
-        const int button_height = 40;
-        const int button_margin_x = 20;
-        const int button_gap = 10;
+        constexpr int kBtnY = 246;
+        constexpr int kBtnH = 42;
+        constexpr int kBtnGap = 12;
+
+        constexpr int kHintY = 306;
+
+        // Color for "active" values (same green as edit mode / ON pills)
+        constexpr uint16_t kActive = t::rgb(110, 200, 100);
+
+        // Position and width of the stat card for a given Field index
+        void statRect(TFT_eSPI &tft, int index, int &x, int &y, int &w)
+        {
+            w = (tft.width() - 2 * kGridMarginX - (kStatCols - 1) * kStatGap) / kStatCols;
+            x = kGridMarginX + (index % kStatCols) * (w + kStatGap);
+            y = kGridTop + (index / kStatCols) * (kStatH + kStatGap);
+        }
 
         unsigned long LAST_UPDATE_DEVICE_STATUS = millis();
         const unsigned long UPDATE_DEVICE_STATUS_INTERVAL_MS = 1990;
@@ -101,18 +122,36 @@ namespace pages
             _last_text[i][0] = '\0';
         }
 
-        tft.fillScreen(TFT_BLACK);
+        static_assert(static_cast<int>(Field::Count) <= kStatCols * kStatRows,
+                      "Not enough room in the stat grid for every Field");
+
+        const int cx = tft.width() / 2;
+
+        tft.fillScreen(t::kBg);
+
+        // Title + divider (same style as the other pages)
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.setTextFont(4);
-        tft.drawString("SENSOR DASHBOARD", tft.width() / 2, title_y);
+        tft.setTextSize(1);
+        tft.setTextColor(t::kCream, t::kBg);
+        tft.drawString("Sensor Dashboard", cx, kTitleY);
+
+        tft.drawFastHLine(cx - 70, kDividerY, 60, t::kSage);
+        tft.drawFastHLine(cx + 10, kDividerY, 60, t::kSage);
+        tft.fillCircle(cx, kDividerY, 3, t::kOchre);
 
         for (int i = 0; i < static_cast<int>(Field::Count); i++)
         {
-            drawRow(tft, static_cast<Field>(i), true);
+            drawStat(tft, static_cast<Field>(i), true);
         }
 
         drawButtons(tft);
+
+        // Static hint
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextFont(2);
+        tft.setTextColor(t::kSage, t::kBg);
+        tft.drawString("Turn to switch   |   Press to select", cx, kHintY);
     }
 
     void SensorDashboardPage::onExit()
@@ -165,15 +204,15 @@ namespace pages
                     actuator_manager::turn_on_lighter();
                 }
                 drawButton(tft, Button::Lighter); // only the text changes
-                drawRow(tft, Field::LighterStatus, false);
+                drawStat(tft, Field::LighterStatus, false);
                 break;
 
             case Button::Stop:
             {
-                page_manager::navigateTo(PageId::SteamingSummaryPage);
-                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source = command_source_t::LOCAL};
                 // network_manager::publish_stop_message(command_data);
                 queue_manager::enqueue_command_data(stop_command);
+                page_manager::navigateTo(PageId::SteamingSummaryPage);
                 return;
             }
 
@@ -194,7 +233,7 @@ namespace pages
             {
                 page_manager::navigateTo(PageId::SteamingSummaryPage);
                 // publish stop message to broker
-                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source=command_source_t::LOCAL};
+                const command_t stop_command = {.command = 0, .setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature()), .timer_minutes = sensor_manager::get_timer(), .source = command_source_t::LOCAL};
                 // network_manager::publish_stop_message(command_data);
                 queue_manager::enqueue_command_data(stop_command);
                 return; // this page is no longer active - don't draw or control below
@@ -207,7 +246,7 @@ namespace pages
 
             for (int i = 0; i < static_cast<int>(Field::Count); i++)
             {
-                drawRow(tft, static_cast<Field>(i), false);
+                drawStat(tft, static_cast<Field>(i), false);
             }
 
             // Keep the button text correct if the lighter changed elsewhere
@@ -322,12 +361,12 @@ namespace pages
         }
     }
 
-    void SensorDashboardPage::drawRow(TFT_eSPI &tft, Field field, bool force)
+    void SensorDashboardPage::drawStat(TFT_eSPI &tft, Field field, bool force)
     {
         char text[32];
         formatValue(field, text, sizeof(text));
 
-        int index = static_cast<int>(field);
+        const int index = static_cast<int>(field);
         if (!force && strcmp(text, _last_text[index]) == 0)
         {
             return; // value hasn't changed - skip the redraw to avoid flicker
@@ -335,15 +374,45 @@ namespace pages
         strncpy(_last_text[index], text, sizeof(_last_text[index]) - 1);
         _last_text[index][sizeof(_last_text[index]) - 1] = '\0';
 
-        char line[48];
-        snprintf(line, sizeof(line), "%s: %s", labelFor(field), text);
+        int x, y, w;
+        statRect(tft, index, x, y, w);
+        const int cx = x + w / 2;
 
-        int y = rowY(field);
-        tft.fillRect(0, y, tft.width(), row_text_h, TFT_BLACK);
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextFont(2);
-        tft.drawString(line, tft.width() / 2, y + row_text_h / 2);
+        tft.setTextSize(1);
+
+        if (force)
+        {
+            // Card frame and label never change, so they are drawn only once
+            tft.fillRoundRect(x, y, w, kStatH, kCardRadius, t::kCardIdle);
+            tft.drawRoundRect(x, y, w, kStatH, kCardRadius, t::kLeafDark);
+
+            tft.setTextFont(2);
+            tft.setTextColor(t::kSage, t::kCardIdle);
+            tft.drawString(labelFor(field), cx, y + 18);
+        }
+
+        // Value: the text padding paints over the previous value in the card
+        // color, so it updates without a clear-then-draw flicker.
+        tft.setTextFont(4);
+        tft.setTextColor(valueColorFor(field, text), t::kCardIdle);
+        tft.setTextPadding(w - 12);
+        tft.drawString(text, cx, y + 54);
+        tft.setTextPadding(0);
+    }
+
+    uint16_t SensorDashboardPage::valueColorFor(Field field, const char *text)
+    {
+        switch (field)
+        {
+        case Field::ValveStatus:
+            return strcmp(text, "Close") == 0 ? t::kSage : kActive;
+        case Field::PumpStatus:
+        case Field::LighterStatus:
+            return strcmp(text, "On") == 0 ? kActive : t::kSage;
+        default:
+            return t::kCream;
+        }
     }
 
     void SensorDashboardPage::formatValue(Field field, char *buffer, size_t bufferSize) const
@@ -398,7 +467,7 @@ namespace pages
         case Field::AirTemperature:
             return "Air Temp";
         case Field::AirHumidity:
-            return "Air Humidity";
+            return "Humidity";
         case Field::ValveStatus:
             return "Valve";
         case Field::PumpStatus:
@@ -408,11 +477,6 @@ namespace pages
         default:
             return "";
         }
-    }
-
-    int SensorDashboardPage::rowY(Field field)
-    {
-        return first_row_y + static_cast<int>(field) * row_height;
     }
 
     const char *SensorDashboardPage::buttonLabel(Button button)
@@ -440,30 +504,33 @@ namespace pages
     {
         const int count = static_cast<int>(Button::Count);
         const int index = static_cast<int>(button);
-        const int button_width = (tft.width() - 2 * button_margin_x - (count - 1) * button_gap) / count;
-        const int x = button_margin_x + index * (button_width + button_gap);
+        const int w = (tft.width() - 2 * kGridMarginX - (count - 1) * kBtnGap) / count;
+        const int x = kGridMarginX + index * (w + kBtnGap);
         const bool focused = (index == _focus);
+        const bool isStop = (button == Button::Stop);
 
-        // Each button has its own color when focused; unfocused ones are grey
-        const uint16_t accent = (button == Button::Lighter) ? TFT_BLUE : TFT_RED;
-        const uint16_t fill = focused ? accent : TFT_DARKGREY;
+        // Same look as the carousel cards: focused = highlighted card with
+        // an ochre border (maroon for Stop, like the Back cards).
+        const uint16_t fill = focused ? (isStop ? t::kBack : t::kLeafDark) : t::kCardIdle;
+        const uint16_t border = focused ? t::kOchre : t::kLeafDark;
 
         if (button == Button::Lighter)
         {
             _lighter_drawn_on = actuator_manager::is_lighter_on();
         }
 
-        tft.fillRoundRect(x, button_y, button_width, button_height, 8, fill);
+        tft.fillRoundRect(x, kBtnY, w, kBtnH, kCardRadius, fill);
+        tft.drawRoundRect(x, kBtnY, w, kBtnH, kCardRadius, border);
         if (focused)
         {
-            // White outline so it's obvious which button a click will hit
-            tft.drawRoundRect(x, button_y, button_width, button_height, 8, TFT_WHITE);
-            tft.drawRoundRect(x + 1, button_y + 1, button_width - 2, button_height - 2, 7, TFT_WHITE);
+            // Thicker border for the focused button
+            tft.drawRoundRect(x + 1, kBtnY + 1, w - 2, kBtnH - 2, kCardRadius - 1, border);
         }
 
         tft.setTextDatum(MC_DATUM);
-        tft.setTextColor(TFT_WHITE, fill);
+        tft.setTextSize(1);
         tft.setTextFont(4);
-        tft.drawString(buttonLabel(button), x + button_width / 2, button_y + button_height / 2);
+        tft.setTextColor(focused ? t::kCream : t::kSage, fill);
+        tft.drawString(buttonLabel(button), x + w / 2, kBtnY + kBtnH / 2);
     }
 }

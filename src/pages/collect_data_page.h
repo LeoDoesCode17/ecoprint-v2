@@ -4,6 +4,12 @@
 
 namespace pages
 {
+    // Horizontal carousel with four cards: Temperature, Timer, Start, Back.
+    //
+    // Scrolling: turn the encoder to move between cards.
+    // Temperature / Timer cards: press to enter edit mode (green border),
+    //   turn to change the value, press again to confirm.
+    // Start / Back cards: press to activate.
     class CollectDataPage : public IPage
     {
     public:
@@ -12,41 +18,32 @@ namespace pages
         void update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed) override;
 
     private:
-        enum class Focus
-        {
-            TemperatureSlider,
-            TimerSlider,
-            StartButton,
-            BackButton
-        };
-
-        enum class SliderType
+        // Order must match kLabels[] in collect_data_page.cpp
+        enum class Card
         {
             Temperature,
-            Timer
+            Timer,
+            Start,
+            Back,
+            Count // not a real card - used only to size loops
         };
 
-        void drawSlider(TFT_eSPI &tft, SliderType type);
-        void drawButton(TFT_eSPI &tft, Focus which);
-        void drawControl(TFT_eSPI &tft, Focus which);
+        void drawCarousel(TFT_eSPI &tft);
+        void drawCard(TFT_eSPI &tft, Card card, int x, bool selected);
+        void drawDots(TFT_eSPI &tft);
+        void drawHint(TFT_eSPI &tft);
         void startCollection();
 
-        // Generalized per-slider-type lookups - same idea as drawButton()
-        // already using `which` to look up a button's own y/label/color.
-        // Add a third slider later by extending these five functions plus
-        // one new Focus/SliderType value; drawSlider()/update() don't change.
-        int &valueFor(SliderType type);
-        int minFor(SliderType type) const;
-        int maxFor(SliderType type) const;
-        int anchorYFor(SliderType type) const;
-        void labelFor(SliderType type, char *buffer, size_t bufferSize) const;
-        static Focus focusFor(SliderType type);
+        // Slider cards only (Temperature / Timer)
+        static bool isSlider(Card card);
+        int &valueFor(Card card);
+        static int minFor(Card card);
+        static int maxFor(Card card);
 
-        Focus _focus = Focus::TemperatureSlider;
+        int _selectedIndex = 0;
 
-        // Only one control can be "in edit mode" at a time - _focus already
-        // says which one, so a single flag is enough (no per-slider flag
-        // needed, and no way for two sliders to end up "editing" at once).
+        // Only the selected card can be in edit mode, so one flag is enough
+        // (there is no way for two sliders to be "editing" at once).
         bool _is_editing = false;
 
         int _current_temparture_celcius_value = 0;
