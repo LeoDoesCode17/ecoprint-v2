@@ -43,11 +43,12 @@ void networkManagementTask(void *pvParameters)
 void publishDeviceStatusTask(void *pv)
 {
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xPeriod = pdMS_TO_TICKS(10000);
-  device_status_t device_status = {.state_machine = StateMachine::IDLE};
+  const TickType_t xPeriod = pdMS_TO_TICKS(5000);
+  device_status_t device_status{};
   Serial.printf("[RTOS] Core %d - publish device status task started.\n", xPortGetCoreID());
   for (;;)
   {
+    device_status = {.state_machine = state_manager::get_state_machine()};
     queue_manager::enqueue_device_status_data(device_status);
     vTaskDelayUntil(&xLastWakeTime, xPeriod);
   }
