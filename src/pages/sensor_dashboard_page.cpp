@@ -7,6 +7,7 @@
 #include "managers/actuator_manager.h"
 #include "managers/network_manager.h"
 #include "managers/queue_manager.h"
+#include "managers/state_manager.h"
 #include "config/constants.h"
 #include "theme.h"
 
@@ -79,14 +80,23 @@ namespace pages
 
         bool is_steaming = false;
 
+        StateMachine current_state_machine{};
+
     }
 
     void SensorDashboardPage::onEnter(TFT_eSPI &tft)
     {
         // init the struct variables
-        sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-        sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-        sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+        // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+        // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+        // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+        // sensor_data.is_fire_on = true;
+        // sensor_data.is_water_sufficient = true;
+        // sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
+
+        sensor_data.water_temperature = 87.5;
+        sensor_data.air_temperature = 86.1;
+        sensor_data.humidity = 95.4;
         sensor_data.is_fire_on = true;
         sensor_data.is_water_sufficient = true;
         sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
@@ -171,6 +181,76 @@ namespace pages
 
         // only publish data sensors and actuator when state_machine is not idle
         // ketika waktu sudah selesai maka publish stop command
+
+        // State machine polling
+        current_state_machine = state_manager::get_state_machine();
+
+        switch (current_state_machine)
+        {
+        case StateMachine::IDLE:
+            state_manager::set_state_machine(StateMachine::PREPARATION);
+            break;
+        case StateMachine::PREPARATION:
+            state_manager::set_state_machine(StateMachine::FILLING_WATER);
+            break;
+        case StateMachine::FILLING_WATER:
+            if (!sensor_data.is_water_sufficient)
+            {
+                if (!actuator_manager::is_pump_on())
+                {
+                    actuator_manager::turn_on_pump();
+                }
+            }
+            else
+            {
+                if (actuator_manager::is_pump_on())
+                {
+                    actuator_manager::turn_off_pump();
+                }
+                state_manager::set_state_machine(StateMachine::FIRING);
+            }
+            break;
+        case StateMachine::FIRING:
+            if (!sensor_data.is_fire_on)
+            {
+                if (!actuator_manager::is_valve_max_opening())
+                {
+                    actuator_manager::open_wide_valve();
+                }
+                else
+                {
+                    if (!actuator_manager::is_lighter_on())
+                    {
+                        actuator_manager::turn_on_lighter();
+                    }
+                }
+            }
+            else
+            {
+                if (actuator_manager::is_lighter_on())
+                {
+                    actuator_manager::turn_off_lighter();
+                }
+                state_manager::set_state_machine(StateMachine::HEATING);
+            }
+            break;
+        case StateMachine::HEATING:
+            if (sensor_data.water_temperature >= sensor_data.setpoint)
+            {
+                state_manager::set_state_machine(StateMachine::STEAMING);
+            }
+            break;
+        case StateMachine::STEAMING:
+            break;
+        case StateMachine::COMPLETED:
+            break;
+        case StateMachine::FAILED:
+            break;
+        case StateMachine::ERROR:
+            break;
+        default:
+            break;
+        }
 
         if (encoderDelta != 0)
         {
@@ -260,11 +340,18 @@ namespace pages
         {
             LAST_SENSOR_UPDATE = millis();
 
-            sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-            sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-            sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+            // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+            // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+            // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+            // sensor_data.is_fire_on = true;
+            // sensor_data.is_water_sufficient = true;
+
+            sensor_data.water_temperature = 87.5;
+            sensor_data.air_temperature = 86.1;
+            sensor_data.humidity = 95.4;
             sensor_data.is_fire_on = true;
             sensor_data.is_water_sufficient = true;
+            sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
             _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
             _outbound_sensor_data.air_temperature = sensor_data.air_temperature;
