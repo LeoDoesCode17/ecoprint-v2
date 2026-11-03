@@ -4,6 +4,7 @@
 #include "managers/page_manager.h"
 #include "managers/network_manager.h"
 #include "managers/sensor_manager.h"
+#include "managers/state_manager.h"
 #include "theme.h"
 
 namespace pages
@@ -89,6 +90,7 @@ namespace pages
             // The sequence numbers are no longer shown on this page, but the
             // counters still have to start from zero for the next run.
             network_manager::reset_message_seq_id();
+            state_manager::set_state_machine(StateMachine::IDLE);
             page_manager::navigateTo(PageId::Menu);
         }
     }
