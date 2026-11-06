@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "config/type.h"
 namespace mqtt {
-    void initialize();
+    void initialize(const char* host, const int port);
     void connect_or_reconnect();
     void loop();
     bool is_connected();

@@ -32,32 +32,33 @@ namespace
 }
 namespace mqtt
 {
-    void initialize()
+    void initialize(const char* host, const int port)
     {
-        if (!MDNS.begin("esp32_mqtt_client"))
-        {
-            Serial.println("Error setting up MDNS responder!");
-            while (1)
-            {
-                delay(1000);
-            }
-        }
-        Serial.println("mDNS responder started");
+        mqtt_client.setServer(host, port);
+        // if (!MDNS.begin("esp32_mqtt_client"))
+        // {
+        //     Serial.println("Error setting up MDNS responder!");
+        //     while (1)
+        //     {
+        //         delay(1000);
+        //     }
+        // }
+        // Serial.println("mDNS responder started");
 
-        // 3. Resolve Raspberry Pi IP address
-        IPAddress brokerIp = resolveMdnsHost(constant::MQTT_BROKER_MDNS);
+        // // 3. Resolve Raspberry Pi IP address
+        // IPAddress brokerIp = resolveMdnsHost(constant::MQTT_BROKER_MDNS);
 
-        // mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
-        // 4. Configure MQTT server with the resolved IP
-        if (brokerIp != INADDR_NONE)
-        {
-            mqtt_client.setServer(brokerIp, constant::RASPI_MQTT_PORT);
-        }
-        else
-        {
-            // if not resolved, fallback to online hive IP or hostname
-            mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
-        }
+        // // mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
+        // // 4. Configure MQTT server with the resolved IP
+        // if (brokerIp != INADDR_NONE)
+        // {
+        //     mqtt_client.setServer(brokerIp, constant::RASPI_MQTT_PORT);
+        // }
+        // else
+        // {
+        //     // if not resolved, fallback to online hive IP or hostname
+        //     mqtt_client.setServer(constant::ECOPRINT_MQTT_HOST, constant::MQTT_PORT);
+        // }
     }
     void connect_or_reconnect()
     {
