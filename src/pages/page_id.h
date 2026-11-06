@@ -27,5 +27,7 @@ namespace pages
         NetworkConfiguration,
         WifiConfiguration,
         MqttConfiguration,
+        NetworkStatus,
+        Placeholder
     };
 }
