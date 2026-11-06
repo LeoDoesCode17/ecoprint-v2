@@ -45,6 +45,9 @@ namespace
     static char _MQTT_USERNAME[MQTT_USERNAME_BUFFER_SIZE];
     static char _MQTT_PASSWORD[MQTT_PASSWORD_BUFFER_SIZE];
 
+    static bool is_time_initialized = false;
+    static uint16_t mqtt_port = 0;
+
     static void init_time()
     {
         configTime(0, 0, "pool.ntp.org", "time.nist.gov");
@@ -64,10 +67,12 @@ namespace
         if (now > 100000)
         {
             Serial.println("[TIME] Time synchronized");
+            is_time_initialized = true;
         }
         else
         {
             Serial.println("[TIME] Time sync failed");
+            is_time_initialized = false;
         }
     }
 
@@ -148,6 +153,28 @@ namespace
         return "unknown";
     }
 
+    bool parse_port(const char *str, uint16_t &out_port)
+    {
+        if (!str || *str == '\0')
+            return false;
+
+        char *endptr = nullptr;
+        errno = 0;
+
+        long val = std::strtol(str, &endptr, 10);
+
+        // Ensure digits were parsed, no invalid trailing text (allowing \r or \n), and valid port range
+        if (str == endptr)
+            return false;
+        if (*endptr != '\0' && *endptr != '\r' && *endptr != '\n')
+            return false;
+        if (errno == ERANGE || val < 1 || val > 65535)
+            return false;
+
+        out_port = static_cast<uint16_t>(val);
+        return true;
+    }
+
     static void on_mqtt_message_callback(char *topic, byte *payload, unsigned int length)
     {
         Serial.printf("[MQTT] Message arrived on [%s]\n", topic);
@@ -209,20 +236,31 @@ namespace network_manager
         build_publish_topics();   // non blocking
         build_subscribe_topics(); // non blocking
 
-        wifi::connect_or_reconnect(); // Blocking
-        mqtt::initialize();
+        parse_port(_MQTT_BROKER_PORT, mqtt_port);
+
+        wifi::initialize(_WIFI_SSID, _WIFI_PASSWORD);   // non blocking
+        mqtt::initialize(_MQTT_BROKER_HOST, mqtt_port); // non blocking
         mqtt::set_callback(on_mqtt_message_callback);
+    }
 
-        // Ensure active MQTT connection BEFORE subscribing to topics
-        mqtt::connect_or_reconnect();
-        mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
+    bool is_wifi_connected()
+    {
+        return wifi::is_connected();
+    }
 
-        init_time();
+    bool is_mqtt_connected()
+    {
+        return mqtt::is_connected();
     }
 
     void conect_or_reconnect()
     {
         wifi::connect_or_reconnect();
+
+        if (!is_time_initialized)
+        {
+            init_time();
+        }
 
         if (!mqtt::is_connected())
         {
