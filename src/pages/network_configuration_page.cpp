@@ -1,6 +1,8 @@
 #include "network_configuration_page.h"
 #include "page_id.h"
 #include "managers/page_manager.h"
+#include "managers/network_manager.h"
+#include "managers/file_system_manager.h"
 #include "theme.h"
 
 namespace pages
@@ -19,6 +21,8 @@ namespace pages
         const NetworkItem items[] = {
             {"Wifi", PageId::WifiConfiguration},
             {"MQTT", PageId::MqttConfiguration},
+            {"Save Config", PageId::Placeholder},
+            {"Status", PageId::NetworkStatus},
             {"Back", PageId::Setting},
         };
 
@@ -102,7 +106,58 @@ namespace pages
 
         if (buttonPressed)
         {
-            page_manager::navigateTo(items[_selectedIndex].target);
+            if (items[_selectedIndex].target == PageId::Placeholder)
+            {
+                // 1. Declare your configuration struct variable
+                network_config_t current_config;
+
+                // 2. Safely duplicate the const char* strings into the struct's char* members
+                current_config.wifi_config.ssid = strdup(network_manager::get_wifi_ssid());
+                current_config.wifi_config.password = strdup(network_manager::get_wifi_password());
+
+                current_config.mqtt_config.host = strdup(network_manager::get_mqtt_broker_host());
+                current_config.mqtt_config.port = strdup(network_manager::get_mqtt_port());
+                current_config.mqtt_config.username = strdup(network_manager::get_mqtt_username());
+                current_config.mqtt_config.password = strdup(network_manager::get_mqtt_password());
+
+                // 3. Print all the config into serial using your new struct variables
+                Serial.println();
+                Serial.println("=========== WIFI CONFIG ===========");
+                Serial.printf("Wifi ssid : %s\n", current_config.wifi_config.ssid);
+                Serial.printf("Wifi password : %s\n", current_config.wifi_config.password);
+                Serial.println("===================================");
+
+                Serial.println("=========== MQTT CONFIG ===========");
+                Serial.printf("MQTT host : %s\n", current_config.mqtt_config.host);
+                Serial.printf("MQTT port : %s\n", current_config.mqtt_config.port);
+                Serial.printf("MQTT username : %s\n", current_config.mqtt_config.username);
+                Serial.printf("MQTT password : %s\n", current_config.mqtt_config.password);
+                Serial.println("===================================");
+
+                bool is_stored = file_system_manager::store_config(current_config);
+                if (is_stored)
+                {
+                    network_manager::set_wifi_ssid(current_config.wifi_config.ssid);
+                    network_manager::set_wifi_password(current_config.wifi_config.password);
+                    network_manager::set_mqtt_broker_host(current_config.mqtt_config.host);
+                    network_manager::set_mqtt_port(current_config.mqtt_config.port);
+                    network_manager::set_mqtt_username(current_config.mqtt_config.username);
+                    network_manager::set_mqtt_password(current_config.mqtt_config.password);
+                }
+
+                // 4. CRITICAL FOR ESP32: Free the allocated heap memory when you are done
+                // to prevent your microcontroller from running out of RAM (crashing).
+                free(current_config.wifi_config.ssid);
+                free(current_config.wifi_config.password);
+                free(current_config.mqtt_config.host);
+                free(current_config.mqtt_config.port);
+                free(current_config.mqtt_config.username);
+                free(current_config.mqtt_config.password);
+            }
+            else
+            {
+                page_manager::navigateTo(items[_selectedIndex].target);
+            }
         }
     }
 
