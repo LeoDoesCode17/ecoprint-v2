@@ -25,6 +25,7 @@
 #include "pages/network_configuration_page.h"
 #include "pages/wifi_configuration_page.h"
 #include "pages/mqtt_configuration_page.h"
+#include "pages/network_status_page.h"
 
 namespace
 {
@@ -112,6 +113,8 @@ namespace
             return &pages::wifiConfigurationPage;
         case pages::PageId::MqttConfiguration:
             return &pages::mqttConfigurationPage;
+        case pages::PageId::NetworkStatus:
+            return &pages::networkStatusPage;
         }
         return &pages::landing_page;
     }

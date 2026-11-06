@@ -1,19 +1,14 @@
 #pragma once
-#include "i_page.h"
+#include "credential_page.h"
 
-namespace pages {
-  class WifiConfigurationPage : public IPage
+namespace pages
+{
+    // WiFi credentials: SSID and password. All behavior lives in
+    // CredentialPage; this class only supplies the fields (see the .cpp).
+    class WifiConfigurationPage : public CredentialPage
     {
     public:
-        void onEnter(TFT_eSPI &tft) override;
-        void onExit() override;
-        void update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed) override;
-
-    private:
-        void drawCarousel(TFT_eSPI &tft);
-        void drawCard(TFT_eSPI &tft, int itemIndex, int x, bool selected);
-        void drawDots(TFT_eSPI &tft);
-        int _selectedIndex = 0;
+        WifiConfigurationPage();
     };
 
     extern WifiConfigurationPage wifiConfigurationPage;

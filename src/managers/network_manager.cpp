@@ -29,6 +29,25 @@ namespace
     static unsigned long actuator_message_seq_id = 0;
     static unsigned long device_status_message_seq_id = 0;
 
+    // wifi credential buffer
+    static const int WIFI_SSID_BUFFER_SIZE = 33; // maximum length is 32 chars
+    static const int WIFI_PASS_BUFFER_SIZE = 64; // maximum length is 63 chars
+    static char _WIFI_SSID[WIFI_SSID_BUFFER_SIZE];
+    static char _WIFI_PASSWORD[WIFI_PASS_BUFFER_SIZE];
+
+    // mqtt credential buffer
+    static const int MQTT_BROKER_HOST_BUFFER_SIZE = 64;
+    static const int MQTT_BROKER_PORT_BUFFER_SIZE = 6; // from 0 - 65535 ports
+    static const int MQTT_USERNAME_BUFFER_SIZE = 64;
+    static const int MQTT_PASSWORD_BUFFER_SIZE = 64;
+    static char _MQTT_BROKER_HOST[MQTT_BROKER_HOST_BUFFER_SIZE];
+    static char _MQTT_BROKER_PORT[MQTT_BROKER_PORT_BUFFER_SIZE];
+    static char _MQTT_USERNAME[MQTT_USERNAME_BUFFER_SIZE];
+    static char _MQTT_PASSWORD[MQTT_PASSWORD_BUFFER_SIZE];
+
+    static bool is_time_initialized = false;
+    static uint16_t mqtt_port = 0;
+
     static void init_time()
     {
         configTime(0, 0, "pool.ntp.org", "time.nist.gov");
@@ -48,10 +67,12 @@ namespace
         if (now > 100000)
         {
             Serial.println("[TIME] Time synchronized");
+            is_time_initialized = true;
         }
         else
         {
             Serial.println("[TIME] Time sync failed");
+            is_time_initialized = false;
         }
     }
 
@@ -132,6 +153,28 @@ namespace
         return "unknown";
     }
 
+    bool parse_port(const char *str, uint16_t &out_port)
+    {
+        if (!str || *str == '\0')
+            return false;
+
+        char *endptr = nullptr;
+        errno = 0;
+
+        long val = std::strtol(str, &endptr, 10);
+
+        // Ensure digits were parsed, no invalid trailing text (allowing \r or \n), and valid port range
+        if (str == endptr)
+            return false;
+        if (*endptr != '\0' && *endptr != '\r' && *endptr != '\n')
+            return false;
+        if (errno == ERANGE || val < 1 || val > 65535)
+            return false;
+
+        out_port = static_cast<uint16_t>(val);
+        return true;
+    }
+
     static void on_mqtt_message_callback(char *topic, byte *payload, unsigned int length)
     {
         Serial.printf("[MQTT] Message arrived on [%s]\n", topic);
@@ -193,20 +236,31 @@ namespace network_manager
         build_publish_topics();   // non blocking
         build_subscribe_topics(); // non blocking
 
-        wifi::connect_or_reconnect(); // Blocking
-        mqtt::initialize();
+        parse_port(_MQTT_BROKER_PORT, mqtt_port);
+
+        wifi::initialize(_WIFI_SSID, _WIFI_PASSWORD);   // non blocking
+        mqtt::initialize(_MQTT_BROKER_HOST, mqtt_port); // non blocking
         mqtt::set_callback(on_mqtt_message_callback);
+    }
 
-        // Ensure active MQTT connection BEFORE subscribing to topics
-        mqtt::connect_or_reconnect();
-        mqtt::subscribe_to_topic(ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
+    bool is_wifi_connected()
+    {
+        return wifi::is_connected();
+    }
 
-        init_time();
+    bool is_mqtt_connected()
+    {
+        return mqtt::is_connected();
     }
 
     void conect_or_reconnect()
     {
         wifi::connect_or_reconnect();
+
+        if (!is_time_initialized)
+        {
+            init_time();
+        }
 
         if (!mqtt::is_connected())
         {
@@ -344,7 +398,7 @@ namespace network_manager
             doc["state_machine"] = static_cast<int>(msg.command_rejected.state);
             doc["source"] = "remote";
             doc["command"] = msg.command_rejected.command.command;
-            doc["is_allowed"] = 0; // 0 means the request event to control is rejected 
+            doc["is_allowed"] = 0; // 0 means the request event to control is rejected
 
             char payload[OUTBOUND_MESSAGE_BUFFER_SIZE];
             serializeJson(doc, payload);
@@ -358,4 +412,65 @@ namespace network_manager
 
         return false;
     }
+
+    void set_wifi_ssid(const char *ssid)
+    {
+        snprintf(_WIFI_SSID, sizeof(_WIFI_SSID), "%s", ssid ? ssid : "");
+    }
+
+    void set_wifi_password(const char *password)
+    {
+        snprintf(_WIFI_PASSWORD, sizeof(_WIFI_PASSWORD), "%s", password ? password : "");
+    }
+
+    void set_mqtt_broker_host(const char *host)
+    {
+        snprintf(_MQTT_BROKER_HOST, sizeof(_MQTT_BROKER_HOST), "%s", host ? host : "");
+    }
+
+    void set_mqtt_port(const char *port)
+    {
+        snprintf(_MQTT_BROKER_PORT, sizeof(_MQTT_BROKER_PORT), "%s", port ? port : "");
+    }
+
+    void set_mqtt_username(const char *username)
+    {
+        snprintf(_MQTT_USERNAME, sizeof(_MQTT_USERNAME), "%s", username ? username : "");
+    }
+
+    void set_mqtt_password(const char *password)
+    {
+        snprintf(_MQTT_PASSWORD, sizeof(_MQTT_PASSWORD), "%s", password ? password : "");
+    }
+
+    const char *get_wifi_ssid()
+    {
+        return _WIFI_SSID;
+    }
+
+    const char *get_wifi_password()
+    {
+        return _WIFI_PASSWORD;
+    }
+
+    const char *get_mqtt_broker_host()
+    {
+        return _MQTT_BROKER_HOST;
+    }
+
+    const char *get_mqtt_port()
+    {
+        return _MQTT_BROKER_PORT;
+    }
+
+    const char *get_mqtt_username()
+    {
+        return _MQTT_USERNAME;
+    }
+
+    const char *get_mqtt_password()
+    {
+        return _MQTT_PASSWORD;
+    }
+
 }

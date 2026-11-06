@@ -7,6 +7,7 @@
 #include "managers/page_manager.h"
 #include "managers/state_manager.h"
 #include "managers/queue_manager.h"
+#include "managers/file_system_manager.h"
 #include "config/constants.h"
 #include "config/type.h"
 
@@ -24,6 +25,7 @@ void networkManagementTask(void *pvParameters)
 {
   Serial.printf("[RTOS] Core %d - Network Management Task Started.\n", xPortGetCoreID());
   outbound_msg_t msg;
+  file_system_manager::initalize();
   network_manager::initialize(); // Handles WiFi + MQTT connection + Subscriptions
   for (;;)
   {
