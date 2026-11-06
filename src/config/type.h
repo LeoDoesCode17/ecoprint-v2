@@ -137,3 +137,21 @@ typedef struct
         command_rejected_t command_rejected;
     };
 } outbound_msg_t;
+
+typedef struct
+{
+    char *ssid;
+    char *password;
+} _wifi_config_t;
+typedef struct
+{
+    char *host;
+    char *port;
+    char *username;
+    char *password;
+} mqtt_config_t;
+typedef struct
+{
+    _wifi_config_t wifi_config;
+    mqtt_config_t mqtt_config;
+} network_config_t;
