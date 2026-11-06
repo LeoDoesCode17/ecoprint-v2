@@ -5,19 +5,23 @@
 
 namespace wifi
 {
+    void initialize(const char *ssid, const char *password)
+    {
+        // We start by connecting to a WiFi network
+        Serial.println();
+        Serial.print("[WiFi] Connecting to ");
+        Serial.println(ssid);
+
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid, password);
+    }
+
     void connect_or_reconnect()
     {
         if (WiFi.status() == WL_CONNECTED)
         {
             return;
         }
-        // We start by connecting to a WiFi network
-        Serial.println();
-        Serial.print("Connecting to ");
-        Serial.println(constant::WIFI_SSID);
-
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(constant::WIFI_SSID, constant::WIFI_PASSWORD);
 
         while (WiFi.status() != WL_CONNECTED)
         {
