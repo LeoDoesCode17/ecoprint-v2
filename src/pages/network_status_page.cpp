@@ -1,64 +1,141 @@
 #include "network_status_page.h"
+#include <Arduino.h>
+#include <stdio.h>
+#include <string.h>
 #include "page_id.h"
-#include "theme.h"
 #include "managers/page_manager.h"
+#include "managers/network_manager.h"
+#include "theme.h"
 
 namespace pages
 {
     NetworkStatusPage networkStatusPage;
     namespace t = theme;
+
     namespace
     {
-        struct MenuItem
-        {
-            const char *label;
-            PageId target;
-        };
-
-        // Add/remove entries here to change the number of menu cards.
-        const MenuItem items[] = {
-            // {"Live Reading", PageId::Page1},
-            {"Start Steaming", PageId::CollectData},
-            {"Test Actuator", PageId::TestActuator},
-            {"Modify Servo", PageId::ModifyServo},
-            {"Collect Data", PageId::CollectData},
-            {"Setting", PageId::Setting},
-        };
-        const int itemCount = sizeof(items) / sizeof(items[0]);
-
-        // Layout (designed for 480x320)
-        constexpr int kTitleY = 34;
-        constexpr int kDividerY = 58;
-        constexpr int kStripY = 90;  // top of the card row
-        constexpr int kStripH = 140; // card height
-        constexpr int kCardW = 240;
-        constexpr int kCardGap = 16;
+        // Layout (designed for 480x320) - same compact header as the
+        // sensor dashboard so both panels fit on one screen
+        constexpr int kTitleY = 22;
+        constexpr int kDividerY = 44;
         constexpr int kCardRadius = 12;
-        constexpr int kDotsY = 262;
-        constexpr int kDotSpacing = 18;
-        constexpr int kHintY = 296;
 
-        // X position of the card in a given slot: 0 = selected (centered),
-        // -1 = left neighbour, +1 = right neighbour.
-        int cardX(TFT_eSPI &tft, int slot)
+        constexpr int kPanelTop = 58;
+        constexpr int kPanelH = 180;
+        constexpr int kPanelMarginX = 10;
+        constexpr int kPanelGap = 10;
+
+        // Inside a panel (offsets from its top-left corner)
+        constexpr int kPanelTitleY = 22;
+        constexpr int kPillCenterY = 58;
+        constexpr int kPillW = 150;
+        constexpr int kPillH = 28;
+        constexpr int kFirstLineY = 96;
+        constexpr int kLineStep = 22;
+        constexpr int kLabelX = 12;
+        constexpr int kValueX = 58; // where the value column starts
+
+        // Back button (the page's only action, so it is always highlighted)
+        constexpr int kBtnY = 250;
+        constexpr int kBtnH = 44;
+        constexpr int kBtnW = 240;
+
+        constexpr int kHintY = 306;
+
+        constexpr unsigned long kRefreshMs = 500;
+
+        // Same green as the other pages' "active" color
+        constexpr uint16_t kOk = t::rgb(110, 200, 100);
+
+        int panelW(TFT_eSPI &tft)
         {
-            return tft.width() / 2 - kCardW / 2 + slot * (kCardW + kCardGap);
+            return (tft.width() - 2 * kPanelMarginX - kPanelGap) / 2;
         }
 
-        int wrapIndex(int i)
+        int panelX(TFT_eSPI &tft, int index)
         {
-            return ((i % itemCount) + itemCount) % itemCount;
+            return kPanelMarginX + index * (panelW(tft) + kPanelGap);
         }
-    } // namespace
+
+        // Copies src into out, shortened with ".." so it fits maxW pixels in
+        // the current font. outSize must be at least 4.
+        void fitText(TFT_eSPI &tft, const char *src, int maxW, char *out, size_t outSize)
+        {
+            const size_t srcLen = strlen(src);
+            if (srcLen < outSize && tft.textWidth(src) <= maxW)
+            {
+                memcpy(out, src, srcLen + 1);
+                return;
+            }
+
+            size_t n = (srcLen < outSize - 3) ? srcLen : outSize - 3;
+            for (; n > 0; n--)
+            {
+                memcpy(out, src, n);
+                out[n] = '.';
+                out[n + 1] = '.';
+                out[n + 2] = '\0';
+                if (tft.textWidth(out) <= maxW)
+                {
+                    return;
+                }
+            }
+            out[0] = '\0';
+        }
+
+        // One "label   value" row inside a panel. Empty values show
+        // "(not set)"; masked values (passwords) show one '*' per character.
+        void drawLine(TFT_eSPI &tft, int px, int pw, int lineIndex,
+                      const char *label, const char *raw, bool masked)
+        {
+            if (raw == nullptr)
+            {
+                raw = "";
+            }
+            const bool isEmpty = (raw[0] == '\0');
+            const int y = kPanelTop + kFirstLineY + lineIndex * kLineStep;
+
+            char display[72];
+            if (isEmpty)
+            {
+                snprintf(display, sizeof(display), "(not set)");
+            }
+            else if (masked)
+            {
+                size_t n = strlen(raw);
+                if (n > sizeof(display) - 1)
+                {
+                    n = sizeof(display) - 1;
+                }
+                memset(display, '*', n);
+                display[n] = '\0';
+            }
+            else
+            {
+                snprintf(display, sizeof(display), "%s", raw);
+            }
+
+            tft.setTextDatum(ML_DATUM);
+            tft.setTextFont(2);
+            tft.setTextSize(1);
+
+            tft.setTextColor(t::kSage, t::kCardIdle);
+            tft.drawString(label, px + kLabelX, y);
+
+            char fitted[72];
+            fitText(tft, display, pw - kValueX - kLabelX, fitted, sizeof(fitted));
+            tft.setTextColor(isEmpty ? t::kSage : t::kCream, t::kCardIdle);
+            tft.drawString(fitted, px + kValueX, y);
+        }
+    }
 
     void NetworkStatusPage::onEnter(TFT_eSPI &tft)
     {
-        selectedIndex_ = 0;
         const int cx = tft.width() / 2;
 
         tft.fillScreen(t::kBg);
 
-        // Title + divider (same style as the landing page)
+        // Title + divider (same style as the other pages)
         tft.setTextDatum(MC_DATUM);
         tft.setTextFont(4);
         tft.setTextSize(1);
@@ -69,100 +146,129 @@ namespace pages
         tft.drawFastHLine(cx + 10, kDividerY, 60, t::kSage);
         tft.fillCircle(cx, kDividerY, 3, t::kOchre);
 
-        // Static hint
-        tft.setTextFont(2);
-        tft.setTextColor(t::kSage, t::kBg);
-        tft.drawString("Turn to scroll   |   Press to select", cx, kHintY);
+        for (int i = 0; i < static_cast<int>(Panel::Count); i++)
+        {
+            drawPanel(tft, static_cast<Panel>(i));
+        }
 
-        drawCarousel(tft);
-        drawDots(tft);
+        // Draw the connection indicators right away
+        _last_wifi_state = -1;
+        _last_mqtt_state = -1;
+        refreshStatus(tft);
+        _last_refresh_ms = millis();
+
+        drawBackButton(tft);
+
+        // Static hint
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextFont(2);
+        tft.setTextSize(1);
+        tft.setTextColor(t::kSage, t::kBg);
+        tft.drawString("Press button to go back", cx, kHintY);
     }
 
     void NetworkStatusPage::onExit()
     {
-        // nothing to clean up
     }
 
     void NetworkStatusPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
+        // Nothing to scroll or edit: the encoder is unused, a click goes back.
+        (void)encoderDelta;
+
         if (buttonPressed)
         {
-            page_manager::navigateTo(PageId::NetworkConfiguration);
+            // page_manager::navigateTo(PageId::NetworkConfiguration);
+            ESP.restart();
+            return;
+        }
+
+        // The connection can drop or come back while this page is open
+        const unsigned long now = millis();
+        if (now - _last_refresh_ms >= kRefreshMs)
+        {
+            _last_refresh_ms = now;
+            refreshStatus(tft);
         }
     }
 
-    void NetworkStatusPage::drawCarousel(TFT_eSPI &tft)
+    void NetworkStatusPage::refreshStatus(TFT_eSPI &tft)
     {
-        // Every pixel of the strip is overwritten exactly once (either by a
-        // card or by a background-colored gap), so there is no full-clear
-        // flicker when scrolling.
-        const int left = cardX(tft, -1);
-        const int right = cardX(tft, 1) + kCardW;
-        if (left > 0)
-            tft.fillRect(0, kStripY, left, kStripH, t::kBg);
-        if (right < tft.width())
-            tft.fillRect(right, kStripY, tft.width() - right, kStripH, t::kBg);
-
-        for (int slot = -1; slot <= 1; slot++)
+        const int wifi = network_manager::is_wifi_connected() ? 1 : 0;
+        if (wifi != _last_wifi_state)
         {
-            const int x = cardX(tft, slot);
+            _last_wifi_state = wifi;
+            drawStatus(tft, Panel::Wifi, wifi == 1);
+        }
 
-            // With a single item there are no neighbours to show.
-            if (slot == 0 || itemCount >= 2)
-            {
-                drawCard(tft, wrapIndex(selectedIndex_ + slot), x, slot == 0);
-            }
-            if (slot < 1)
-            {
-                tft.fillRect(x + kCardW, kStripY, kCardGap, kStripH, t::kBg);
-            }
+        const int mqtt = network_manager::is_mqtt_connected() ? 1 : 0;
+        if (mqtt != _last_mqtt_state)
+        {
+            _last_mqtt_state = mqtt;
+            drawStatus(tft, Panel::Mqtt, mqtt == 1);
         }
     }
 
-    void NetworkStatusPage::drawCard(TFT_eSPI &tft, int itemIndex, int x, bool selected)
+    void NetworkStatusPage::drawPanel(TFT_eSPI &tft, Panel panel)
     {
-        const uint16_t fill = selected ? t::kLeafDark : t::kCardIdle;
-        const uint16_t border = selected ? t::kOchre : t::kLeafDark;
+        const int w = panelW(tft);
+        const int x = panelX(tft, static_cast<int>(panel));
 
-        tft.fillRoundRect(x, kStripY, kCardW, kStripH, kCardRadius, fill);
-        tft.drawRoundRect(x, kStripY, kCardW, kStripH, kCardRadius, border);
-        if (selected)
-        {
-            // Thicker border for the selected card
-            tft.drawRoundRect(x + 1, kStripY + 1, kCardW - 2, kStripH - 2,
-                              kCardRadius - 1, border);
-        }
+        tft.fillRoundRect(x, kPanelTop, w, kPanelH, kCardRadius, t::kCardIdle);
+        tft.drawRoundRect(x, kPanelTop, w, kPanelH, kCardRadius, t::kLeafDark);
 
+        tft.setTextDatum(MC_DATUM);
         tft.setTextFont(4);
         tft.setTextSize(1);
-        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(t::kCream, t::kCardIdle);
+        tft.drawString(panel == Panel::Wifi ? "WiFi" : "MQTT", x + w / 2, kPanelTop + kPanelTitleY);
 
-        // Only draw the label if it fits fully on screen. Neighbour cards that
-        // are cut off by the screen edge show just their shape, which avoids
-        // half-clipped text.
-        const char *label = items[itemIndex].label;
-        const int cx = x + kCardW / 2;
-        const int tw = tft.textWidth(label);
-        if (cx - tw / 2 >= 0 && cx + tw / 2 <= tft.width())
+        if (panel == Panel::Wifi)
         {
-            tft.setTextColor(selected ? t::kCream : t::kSage, fill);
-            tft.drawString(label, cx, kStripY + kStripH / 2);
+            drawLine(tft, x, w, 0, "SSID", network_manager::get_wifi_ssid(), false);
+            drawLine(tft, x, w, 1, "Pass", network_manager::get_wifi_password(), true);
+        }
+        else
+        {
+            drawLine(tft, x, w, 0, "Host", network_manager::get_mqtt_broker_host(), false);
+            drawLine(tft, x, w, 1, "Port", network_manager::get_mqtt_port(), false);
+            drawLine(tft, x, w, 2, "User", network_manager::get_mqtt_username(), false);
+            drawLine(tft, x, w, 3, "Pass", network_manager::get_mqtt_password(), true);
         }
     }
 
-    void NetworkStatusPage::drawDots(TFT_eSPI &tft)
+    void NetworkStatusPage::drawStatus(TFT_eSPI &tft, Panel panel, bool connected)
     {
-        const int totalW = (itemCount - 1) * kDotSpacing;
-        const int startX = tft.width() / 2 - totalW / 2;
+        const int w = panelW(tft);
+        const int cx = panelX(tft, static_cast<int>(panel)) + w / 2;
+        const int cy = kPanelTop + kPillCenterY;
 
-        for (int i = 0; i < itemCount; i++)
-        {
-            const int x = startX + i * kDotSpacing;
-            tft.fillCircle(x, kDotsY, 6, t::kBg); // erase previous state
-            if (i == selectedIndex_)
-                tft.fillCircle(x, kDotsY, 5, t::kOchre);
-            else
-                tft.fillCircle(x, kDotsY, 3, t::kLeafMid);
-        }
+        // The pill always covers the same rectangle, so a redraw fully
+        // replaces the previous state - no clearing needed.
+        const uint16_t fill = connected ? kOk : t::kTerracotta;
+        const uint16_t text = connected ? t::kBg : t::kCream;
+
+        tft.fillRoundRect(cx - kPillW / 2, cy - kPillH / 2, kPillW, kPillH, kPillH / 2, fill);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextFont(2);
+        tft.setTextSize(1);
+        tft.setTextColor(text, fill);
+        tft.drawString(connected ? "Connected" : "Disconnected", cx, cy);
+    }
+
+    void NetworkStatusPage::drawBackButton(TFT_eSPI &tft)
+    {
+        // Same look as a selected Back card on the carousel pages
+        const int x = (tft.width() - kBtnW) / 2;
+
+        tft.fillRoundRect(x, kBtnY, kBtnW, kBtnH, kCardRadius, t::kBack);
+        tft.drawRoundRect(x, kBtnY, kBtnW, kBtnH, kCardRadius, t::kOchre);
+        tft.drawRoundRect(x + 1, kBtnY + 1, kBtnW - 2, kBtnH - 2, kCardRadius - 1, t::kOchre);
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextFont(4);
+        tft.setTextSize(1);
+        tft.setTextColor(t::kCream, t::kBack);
+        tft.drawString("CONNECT", tft.width() / 2, kBtnY + kBtnH / 2);
     }
 }
