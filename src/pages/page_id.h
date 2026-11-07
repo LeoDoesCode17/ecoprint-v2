@@ -28,6 +28,7 @@ namespace pages
         WifiConfiguration,
         MqttConfiguration,
         NetworkStatus,
-        Placeholder
+        Placeholder,
+        RestartConfirmation
     };
 }
