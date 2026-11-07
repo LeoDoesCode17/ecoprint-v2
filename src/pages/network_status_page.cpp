@@ -35,10 +35,11 @@ namespace pages
         constexpr int kLabelX = 12;
         constexpr int kValueX = 58; // where the value column starts
 
-        // Back button (the page's only action, so it is always highlighted)
+        // Button row: [Connect] [Back]
         constexpr int kBtnY = 250;
         constexpr int kBtnH = 44;
-        constexpr int kBtnW = 240;
+        constexpr int kBtnMarginX = 10;
+        constexpr int kBtnGap = 12;
 
         constexpr int kHintY = 306;
 
@@ -157,14 +158,15 @@ namespace pages
         refreshStatus(tft);
         _last_refresh_ms = millis();
 
-        drawBackButton(tft);
+        _focus = static_cast<int>(Button::Back);
+        drawButtons(tft);
 
         // Static hint
         tft.setTextDatum(MC_DATUM);
         tft.setTextFont(2);
         tft.setTextSize(1);
         tft.setTextColor(t::kSage, t::kBg);
-        tft.drawString("Press button to go back", cx, kHintY);
+        tft.drawString("Turn to switch   |   Press to select", cx, kHintY);
     }
 
     void NetworkStatusPage::onExit()
@@ -173,14 +175,37 @@ namespace pages
 
     void NetworkStatusPage::update(TFT_eSPI &tft, long encoderDelta, bool buttonPressed)
     {
-        // Nothing to scroll or edit: the encoder is unused, a click goes back.
-        (void)encoderDelta;
+        // The encoder moves focus between the buttons
+        if (encoderDelta != 0)
+        {
+            const int count = static_cast<int>(Button::Count);
+            const int previous = _focus;
+            _focus = ((_focus + static_cast<int>(encoderDelta)) % count + count) % count;
+
+            if (_focus != previous)
+            {
+                // Only the two buttons whose focus changed need a redraw
+                drawButton(tft, static_cast<Button>(previous));
+                drawButton(tft, static_cast<Button>(_focus));
+            }
+        }
 
         if (buttonPressed)
         {
-            // page_manager::navigateTo(PageId::NetworkConfiguration);
-            ESP.restart();
-            return;
+            switch (static_cast<Button>(_focus))
+            {
+            case Button::Connect:
+                // New credentials are applied by restarting, so ask first
+                page_manager::navigateTo(PageId::RestartConfirmation);
+                return;
+
+            case Button::Back:
+                page_manager::navigateTo(PageId::NetworkConfiguration);
+                return;
+
+            default:
+                break;
+            }
         }
 
         // The connection can drop or come back while this page is open
@@ -256,19 +281,52 @@ namespace pages
         tft.drawString(connected ? "Connected" : "Disconnected", cx, cy);
     }
 
-    void NetworkStatusPage::drawBackButton(TFT_eSPI &tft)
+    const char *NetworkStatusPage::buttonLabel(Button button)
     {
-        // Same look as a selected Back card on the carousel pages
-        const int x = (tft.width() - kBtnW) / 2;
+        switch (button)
+        {
+        case Button::Connect:
+            return "Connect";
+        case Button::Back:
+            return "Back";
+        default:
+            return "";
+        }
+    }
 
-        tft.fillRoundRect(x, kBtnY, kBtnW, kBtnH, kCardRadius, t::kBack);
-        tft.drawRoundRect(x, kBtnY, kBtnW, kBtnH, kCardRadius, t::kOchre);
-        tft.drawRoundRect(x + 1, kBtnY + 1, kBtnW - 2, kBtnH - 2, kCardRadius - 1, t::kOchre);
+    void NetworkStatusPage::drawButtons(TFT_eSPI &tft)
+    {
+        for (int i = 0; i < static_cast<int>(Button::Count); i++)
+        {
+            drawButton(tft, static_cast<Button>(i));
+        }
+    }
+
+    void NetworkStatusPage::drawButton(TFT_eSPI &tft, Button button)
+    {
+        const int count = static_cast<int>(Button::Count);
+        const int index = static_cast<int>(button);
+        const int w = (tft.width() - 2 * kBtnMarginX - (count - 1) * kBtnGap) / count;
+        const int x = kBtnMarginX + index * (w + kBtnGap);
+        const bool focused = (index == _focus);
+
+        // Same look as the carousel cards: focused = highlighted card with an
+        // ochre border (maroon for Back, like the Back cards).
+        const uint16_t fill = focused ? (button == Button::Back ? t::kBack : t::kLeafDark) : t::kCardIdle;
+        const uint16_t border = focused ? t::kOchre : t::kLeafDark;
+
+        tft.fillRoundRect(x, kBtnY, w, kBtnH, kCardRadius, fill);
+        tft.drawRoundRect(x, kBtnY, w, kBtnH, kCardRadius, border);
+        if (focused)
+        {
+            // Thicker border for the focused button
+            tft.drawRoundRect(x + 1, kBtnY + 1, w - 2, kBtnH - 2, kCardRadius - 1, border);
+        }
 
         tft.setTextDatum(MC_DATUM);
         tft.setTextFont(4);
         tft.setTextSize(1);
-        tft.setTextColor(t::kCream, t::kBack);
-        tft.drawString("CONNECT", tft.width() / 2, kBtnY + kBtnH / 2);
+        tft.setTextColor(focused ? t::kCream : t::kSage, fill);
+        tft.drawString(buttonLabel(button), x + w / 2, kBtnY + kBtnH / 2);
     }
 }

@@ -21,7 +21,7 @@ namespace pages
         const NetworkItem items[] = {
             {"Wifi", PageId::WifiConfiguration},
             {"MQTT", PageId::MqttConfiguration},
-            {"Save Config", PageId::Placeholder},
+            // {"Save Config", PageId::Placeholder},
             {"Status", PageId::NetworkStatus},
             {"Back", PageId::Setting},
         };
