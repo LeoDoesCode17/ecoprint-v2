@@ -8,6 +8,7 @@ namespace
 {
     static WiFiClient esp_client;
     static PubSubClient mqtt_client(esp_client);
+    static const char *MQTT_CLIENT_ID = "ESP32";
 
     static IPAddress resolveMdnsHost(const char *host)
     {
@@ -67,16 +68,9 @@ namespace mqtt
         {
             Serial.print("Attempting MQTT connection...");
             // Attempt to connect
-            if (mqtt_client.connect(constant::MQTT_CLIENT_ID))
+            if (mqtt_client.connect(MQTT_CLIENT_ID))
             {
                 Serial.println("connected");
-                // Once connected, publish an announcement...
-                mqtt_client.publish(constant::PUBLISH_TOPIC, "Hello from ESP32");
-                // ... and resubscribe
-                mqtt_client.subscribe(constant::SUBSCRIBE_TOPIC);
-                mqtt_client.subscribe(constant::SUBSCRIBE_CONFIG_TOPIC);
-                mqtt_client.subscribe(constant::SUBSCRIBE_ACTUATOR_TOPIC);
-                mqtt_client.subscribe(constant::ECOPRINT_SUBSCRIBE_COMMAND_TOPIC);
             }
             else
             {

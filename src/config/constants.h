@@ -6,31 +6,10 @@ namespace constant
     // const unsigned int ZERO_PERCENT_DEGREE = 9;
     const unsigned int VALVE_PERCENT_TO_DEGREE_GRADIENT = 94;
     const unsigned int VALVE_PERCENT_TO_DEGREE_OFFSET = 6;
-    const char WIFI_SSID[] = "WIFI_SSID";
-    const char WIFI_PASSWORD[] = "WIFI_PASSWORD";
-    const char MQTT_BROKER_MDNS[] = "raspberrypi";
-    const char ECOPRINT_MQTT_HOST[] = "broker.mqtt.cool";
     const uint8_t MIN_SETPOINT_CELCIUS = 50;
     const uint8_t MAX_SETPOINT_CELCIUS = 100;
     const uint8_t MIN_TIMER_MINUTE = 1;
     const uint8_t MAX_TIMER_MINUTE = 120;
-    const int MQTT_PORT = 1883;
-    const int RASPI_MQTT_PORT = 1884;
-    const unsigned long MSG_BUFFER_SIZE = 100;
-    const char MQTT_CLIENT_ID[] = "ESP32";
-    const char ECOPRINT_MQTT_CLIENT_ID[] = "esp_client";
-    const char SUBSCRIBE_TOPIC[] = "mqtt/first";
-    const char PUBLISH_TOPIC[] = "mqtt/second";
-    const char PUBLISH_STATUS_TOPIC[] = "ecoprint/mac-address/status";  
-    const char PUBLISH_SENSORS_TOPIC[] = "ecoprint/mac-address/sensors";
-    const char SUBCRIBE_COMMAND_TOPIC[] = "ecoprint/mac-address/command";
-    const char SUBSCRIBE_ACTUATOR_TOPIC[] = "ecoprint/mac-address/actuator";
-    const char SUBSCRIBE_CONFIG_TOPIC[] = "ecoprint/mac-address/config";
-
-    const char ECOPRINT_PUBLISH_SENSORS_TOPIC[] = "esp/F4:65:0B:54:B0:54/telemetry";
-    const char ECOPRINT_SUBSCRIBE_COMMAND_TOPIC[] = "esp/F4:65:0B:54:B0:54/command";
-
-    const int MAC_BUF_SIZE = 18;
 
     const unsigned long MAIN_LOOP_INTERVAL_MS = 10;
     const unsigned long PUBLISH_SENSOR_DATA_INTERVAL_MS = 1990;

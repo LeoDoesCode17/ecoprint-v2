@@ -14,9 +14,10 @@ namespace
 {
     static const int COMMAND_MESSAGE_BUFFER_SIZE = 256;
     static const int OUTBOUND_MESSAGE_BUFFER_SIZE = 256;
+    static const int MAC_BUF_SIZE = 18;
     static const int ISO8601_BUFFER_SIZE = 26;
     constexpr size_t _TOPIC_BUF_SIZE = 64;
-    static char mac[constant::MAC_BUF_SIZE];
+    static char mac[MAC_BUF_SIZE];
 
     static char ECOPRINT_PUBLISH_SENSORS_TOPIC[_TOPIC_BUF_SIZE];
     static char ECOPRINT_PUBLISH_ACTUATORS_TOPIC[_TOPIC_BUF_SIZE];
