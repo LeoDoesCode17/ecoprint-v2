@@ -26,6 +26,7 @@
 #include "pages/wifi_configuration_page.h"
 #include "pages/mqtt_configuration_page.h"
 #include "pages/network_status_page.h"
+#include "pages/restart_confirmation_page.h"
 
 namespace
 {
@@ -115,6 +116,8 @@ namespace
             return &pages::mqttConfigurationPage;
         case pages::PageId::NetworkStatus:
             return &pages::networkStatusPage;
+        case pages::PageId::RestartConfirmation:
+            return &pages::restartConfirmationPage;
         }
         return &pages::landing_page;
     }
