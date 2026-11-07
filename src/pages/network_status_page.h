@@ -7,7 +7,10 @@ namespace pages
     //   - a WiFi panel and an MQTT panel, each with a live Connected /
     //     Disconnected indicator and the current credential values from
     //     network_manager (passwords are masked)
-    //   - a Back button; any click returns to the network configuration page
+    //   - two buttons: Connect (opens the restart confirmation page, since
+    //     the new credentials are applied by restarting the device) and Back.
+    //     The encoder moves focus between them, a click activates the
+    //     focused one.
     class NetworkStatusPage : public IPage
     {
     public:
@@ -28,7 +31,21 @@ namespace pages
         // The Connected / Disconnected indicator (redrawn when it changes)
         void drawStatus(TFT_eSPI &tft, Panel panel, bool connected);
         void refreshStatus(TFT_eSPI &tft);
-        void drawBackButton(TFT_eSPI &tft);
+
+        enum class Button
+        {
+            Connect,
+            Back,
+            Count // not a real button - used only to size loops
+        };
+
+        void drawButtons(TFT_eSPI &tft);
+        void drawButton(TFT_eSPI &tft, Button button);
+        static const char *buttonLabel(Button button);
+
+        // Index of the focused Button. Defaults to Back so a plain click on
+        // entering the page just goes back, like before.
+        int _focus = static_cast<int>(Button::Back);
 
         // Last connection state drawn per panel: -1 = nothing drawn yet,
         // 0 = disconnected, 1 = connected. Lets us redraw only on a change.
