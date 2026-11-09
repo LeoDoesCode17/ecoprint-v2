@@ -42,6 +42,8 @@ namespace pages
         // Color for "active" values (same green as edit mode / ON pills)
         constexpr uint16_t kActive = t::rgb(110, 200, 100);
 
+        device_status_t device_status{};
+
         // Position and width of the stat card for a given Field index
         void statRect(TFT_eSPI &tft, int index, int &x, int &y, int &w)
         {
@@ -56,7 +58,7 @@ namespace pages
         unsigned long LAST_REFRESH = millis();
         const unsigned long REFRESH_INTERVAL_MS = 500;
 
-        const unsigned long SENSOR_UPDATE_INTERVAL_MS = 1990;
+    const unsigned long SENSOR_UPDATE_INTERVAL_MS = 90;
         unsigned long LAST_SENSOR_UPDATE = millis();
 
         const unsigned long ACTUATOR_UPDATE_INTERVAL_MS = 90;
@@ -78,8 +80,6 @@ namespace pages
         actuator_t _outbound_actuator_data;
         unsigned long timer_second;
 
-        bool is_steaming = false;
-
         StateMachine current_state_machine{};
 
     }
@@ -87,18 +87,11 @@ namespace pages
     void SensorDashboardPage::onEnter(TFT_eSPI &tft)
     {
         // init the struct variables
-        // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-        // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-        // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
-        // sensor_data.is_fire_on = true;
-        // sensor_data.is_water_sufficient = true;
-        // sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
-
-        sensor_data.water_temperature = 87.5;
-        sensor_data.air_temperature = 86.1;
-        sensor_data.humidity = 95.4;
-        sensor_data.is_fire_on = true;
-        sensor_data.is_water_sufficient = true;
+        sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+        sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+        sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+        sensor_data.is_fire_on = sensor_manager::is_fire_detected();
+        sensor_data.is_water_sufficient = sensor_manager::is_water_sufficient();
         sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
         _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
@@ -189,59 +182,75 @@ namespace pages
         {
         case StateMachine::IDLE:
             state_manager::set_state_machine(StateMachine::PREPARATION);
+            device_status = {.state_machine = state_manager::get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             break;
         case StateMachine::PREPARATION:
             state_manager::set_state_machine(StateMachine::FILLING_WATER);
+            device_status = {.state_machine = state_manager::get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             break;
         case StateMachine::FILLING_WATER:
             if (!sensor_data.is_water_sufficient)
             {
-                if (!actuator_manager::is_pump_on())
-                {
-                    actuator_manager::turn_on_pump();
-                }
+                actuator_manager::turn_on_pump();
             }
             else
             {
-                if (actuator_manager::is_pump_on())
-                {
-                    actuator_manager::turn_off_pump();
-                }
+                actuator_manager::turn_off_pump();
                 state_manager::set_state_machine(StateMachine::FIRING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::FIRING:
             if (!sensor_data.is_fire_on)
             {
-                if (!actuator_manager::is_valve_max_opening())
-                {
-                    actuator_manager::open_wide_valve();
-                }
-                else
-                {
-                    if (!actuator_manager::is_lighter_on())
-                    {
-                        actuator_manager::turn_on_lighter();
-                    }
-                }
+                actuator_manager::open_wide_valve();
+                actuator_manager::turn_on_lighter();
             }
             else
             {
-                if (actuator_manager::is_lighter_on())
-                {
-                    actuator_manager::turn_off_lighter();
-                }
+                actuator_manager::turn_off_lighter();
                 state_manager::set_state_machine(StateMachine::HEATING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::HEATING:
             if (sensor_data.water_temperature >= sensor_data.setpoint)
             {
                 state_manager::set_state_machine(StateMachine::STEAMING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::STEAMING:
-            break;
+        {
+            if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
+            {
+                LAST_CONTROL = millis();
+                const float temp = sensor_data.water_temperature;
+                const float upper = sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND;
+                const float lower = sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND;
+
+                if (temp >= upper)
+                {
+                    actuator_manager::open_narrow_valve();
+                    actuator_manager::turn_on_pump();
+                }
+                else if (temp >= sensor_data.setpoint)
+                {
+                    actuator_manager::open_narrow_valve();
+                }
+                else if (temp <= lower)
+                {
+                    actuator_manager::turn_off_pump();
+                    actuator_manager::open_wide_valve();
+                }
+            }
+        }
+        break;
         case StateMachine::COMPLETED:
             break;
         case StateMachine::FAILED:
@@ -340,17 +349,11 @@ namespace pages
         {
             LAST_SENSOR_UPDATE = millis();
 
-            // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-            // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-            // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
-            // sensor_data.is_fire_on = true;
-            // sensor_data.is_water_sufficient = true;
-
-            sensor_data.water_temperature = 87.5;
-            sensor_data.air_temperature = 86.1;
-            sensor_data.humidity = 95.4;
-            sensor_data.is_fire_on = true;
-            sensor_data.is_water_sufficient = true;
+            sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+            sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+            sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+            sensor_data.is_fire_on = sensor_manager::is_fire_detected();
+            sensor_data.is_water_sufficient = sensor_manager::is_water_sufficient();
             sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
             _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
@@ -359,13 +362,6 @@ namespace pages
             _outbound_sensor_data.is_fire_on = sensor_data.water_temperature;
             _outbound_sensor_data.is_water_sufficient = sensor_data.water_temperature;
 
-            if (!is_steaming)
-            {
-                if (sensor_data.water_temperature >= sensor_data.setpoint)
-                {
-                    is_steaming = true;
-                }
-            }
             Serial.printf("[SENSOR] Thermocouple offset is: %f\n", sensor_manager::get_thermocouple_offset());
         }
 
@@ -402,49 +398,14 @@ namespace pages
 
             if (is_different)
             {
-                // network_manager::publish_actuator_data(actuator_data);
+                queue_manager::enqueue_actuator_data(_outbound_actuator_data);
             }
         }
 
         if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
-            // network_manager::publish_sensor_data(sensor_data);
             queue_manager::enqueue_sensor_data(_outbound_sensor_data);
-
-            // for data collecting
-            // network_manager::publish_actuator_data(actuator_data);
-            queue_manager::enqueue_actuator_data(_outbound_actuator_data);
-        }
-
-        if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
-        {
-            LAST_CONTROL = millis();
-
-            // if (!is_steaming)
-            // {
-            //     actuator_manager::open_wide_valve();
-            // } else {
-            //     actuator_manager::open_narrow_valve();
-            // }
-            const float temp = sensor_data.water_temperature;
-            const float upper = sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND;
-            const float lower = sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND;
-
-            if (temp >= upper)
-            {
-                actuator_manager::open_narrow_valve();
-                actuator_manager::turn_on_pump();
-            }
-            else if (temp >= sensor_data.setpoint)
-            {
-                actuator_manager::open_narrow_valve();
-            }
-            else if (temp <= lower)
-            {
-                actuator_manager::turn_off_pump();
-                actuator_manager::open_wide_valve();
-            }
         }
     }
 
