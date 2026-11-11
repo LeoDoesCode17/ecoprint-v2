@@ -4,6 +4,7 @@
 #include "managers/page_manager.h"
 #include "managers/network_manager.h"
 #include "managers/sensor_manager.h"
+#include "managers/queue_manager.h"
 #include "managers/state_manager.h"
 #include "theme.h"
 
@@ -91,6 +92,8 @@ namespace pages
             // counters still have to start from zero for the next run.
             network_manager::reset_message_seq_id();
             state_manager::set_state_machine(StateMachine::IDLE);
+            const device_status_t device_status = {.state_machine = state_manager::get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             page_manager::navigateTo(PageId::Menu);
         }
     }

@@ -20,16 +20,22 @@ namespace pages
     {
         // Layout (designed for 480x320) - theme and card style shared with
         // the other pages (see theme.h)
-        constexpr int kTitleY = 22;
-        constexpr int kDividerY = 44;
+        constexpr int kTitleY = 20;
         constexpr int kCardRadius = 12;
+
+        // State machine indicator: a pill in the band between the title and
+        // the grid, with a line running out to each side of it
+        constexpr int kStateY = 52; // vertical center of the pill
+        constexpr int kStateW = 240;
+        constexpr int kStateH = 30;
+        constexpr int kStateLineMargin = 24;
 
         // Stat cards: a kStatCols x kStatRows grid of read-only cards
         constexpr int kStatCols = 4;
         constexpr int kStatRows = 2;
         constexpr int kGridMarginX = 16;
-        constexpr int kGridTop = 58;
-        constexpr int kStatH = 84;
+        constexpr int kGridTop = 72;
+        constexpr int kStatH = 78;
         constexpr int kStatGap = 8;
 
         // Button row: [Lighter ON/OFF toggle] [Stop]
@@ -41,6 +47,8 @@ namespace pages
 
         // Color for "active" values (same green as edit mode / ON pills)
         constexpr uint16_t kActive = t::rgb(110, 200, 100);
+
+        device_status_t device_status{};
 
         // Position and width of the stat card for a given Field index
         void statRect(TFT_eSPI &tft, int index, int &x, int &y, int &w)
@@ -56,7 +64,7 @@ namespace pages
         unsigned long LAST_REFRESH = millis();
         const unsigned long REFRESH_INTERVAL_MS = 500;
 
-        const unsigned long SENSOR_UPDATE_INTERVAL_MS = 1990;
+    const unsigned long SENSOR_UPDATE_INTERVAL_MS = 90;
         unsigned long LAST_SENSOR_UPDATE = millis();
 
         const unsigned long ACTUATOR_UPDATE_INTERVAL_MS = 90;
@@ -78,8 +86,6 @@ namespace pages
         actuator_t _outbound_actuator_data;
         unsigned long timer_second;
 
-        bool is_steaming = false;
-
         StateMachine current_state_machine{};
 
     }
@@ -87,18 +93,11 @@ namespace pages
     void SensorDashboardPage::onEnter(TFT_eSPI &tft)
     {
         // init the struct variables
-        // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-        // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-        // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
-        // sensor_data.is_fire_on = true;
-        // sensor_data.is_water_sufficient = true;
-        // sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
-
-        sensor_data.water_temperature = 87.5;
-        sensor_data.air_temperature = 86.1;
-        sensor_data.humidity = 95.4;
-        sensor_data.is_fire_on = true;
-        sensor_data.is_water_sufficient = true;
+        sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+        sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+        sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+        sensor_data.is_fire_on = sensor_manager::is_fire_detected();
+        sensor_data.is_water_sufficient = sensor_manager::is_water_sufficient();
         sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
         _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
@@ -139,16 +138,23 @@ namespace pages
 
         tft.fillScreen(t::kBg);
 
-        // Title + divider (same style as the other pages)
+        // Title
         tft.setTextDatum(MC_DATUM);
         tft.setTextFont(4);
         tft.setTextSize(1);
         tft.setTextColor(t::kCream, t::kBg);
         tft.drawString("Sensor Dashboard", cx, kTitleY);
 
-        tft.drawFastHLine(cx - 70, kDividerY, 60, t::kSage);
-        tft.drawFastHLine(cx + 10, kDividerY, 60, t::kSage);
-        tft.fillCircle(cx, kDividerY, 3, t::kOchre);
+        // Lines on both sides of the state pill (the pill itself is drawn
+        // by refreshState())
+        const int lineGap = 10;
+        const int leftEnd = cx - kStateW / 2 - lineGap;
+        const int rightStart = cx + kStateW / 2 + lineGap;
+        tft.drawFastHLine(kStateLineMargin, kStateY, leftEnd - kStateLineMargin, t::kSage);
+        tft.drawFastHLine(rightStart, kStateY, tft.width() - kStateLineMargin - rightStart, t::kSage);
+
+        _last_state = -1;
+        refreshState(tft);
 
         for (int i = 0; i < static_cast<int>(Field::Count); i++)
         {
@@ -189,59 +195,75 @@ namespace pages
         {
         case StateMachine::IDLE:
             state_manager::set_state_machine(StateMachine::PREPARATION);
+            device_status = {.state_machine = state_manager::get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             break;
         case StateMachine::PREPARATION:
             state_manager::set_state_machine(StateMachine::FILLING_WATER);
+            device_status = {.state_machine = state_manager::get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             break;
         case StateMachine::FILLING_WATER:
             if (!sensor_data.is_water_sufficient)
             {
-                if (!actuator_manager::is_pump_on())
-                {
-                    actuator_manager::turn_on_pump();
-                }
+                actuator_manager::turn_on_pump();
             }
             else
             {
-                if (actuator_manager::is_pump_on())
-                {
-                    actuator_manager::turn_off_pump();
-                }
+                actuator_manager::turn_off_pump();
                 state_manager::set_state_machine(StateMachine::FIRING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::FIRING:
             if (!sensor_data.is_fire_on)
             {
-                if (!actuator_manager::is_valve_max_opening())
-                {
-                    actuator_manager::open_wide_valve();
-                }
-                else
-                {
-                    if (!actuator_manager::is_lighter_on())
-                    {
-                        actuator_manager::turn_on_lighter();
-                    }
-                }
+                actuator_manager::open_wide_valve();
+                actuator_manager::turn_on_lighter();
             }
             else
             {
-                if (actuator_manager::is_lighter_on())
-                {
-                    actuator_manager::turn_off_lighter();
-                }
+                actuator_manager::turn_off_lighter();
                 state_manager::set_state_machine(StateMachine::HEATING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::HEATING:
             if (sensor_data.water_temperature >= sensor_data.setpoint)
             {
                 state_manager::set_state_machine(StateMachine::STEAMING);
+                device_status = {.state_machine = state_manager::get_state_machine()};
+                queue_manager::enqueue_device_status_data(device_status);
             }
             break;
         case StateMachine::STEAMING:
-            break;
+        {
+            if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
+            {
+                LAST_CONTROL = millis();
+                const float temp = sensor_data.water_temperature;
+                const float upper = sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND;
+                const float lower = sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND;
+
+                if (temp >= upper)
+                {
+                    actuator_manager::open_narrow_valve();
+                    actuator_manager::turn_on_pump();
+                }
+                else if (temp >= sensor_data.setpoint)
+                {
+                    actuator_manager::open_narrow_valve();
+                }
+                else if (temp <= lower)
+                {
+                    actuator_manager::turn_off_pump();
+                    actuator_manager::open_wide_valve();
+                }
+            }
+        }
+        break;
         case StateMachine::COMPLETED:
             break;
         case StateMachine::FAILED:
@@ -251,6 +273,9 @@ namespace pages
         default:
             break;
         }
+
+        // Show the (possibly just changed) state machine state
+        refreshState(tft);
 
         if (encoderDelta != 0)
         {
@@ -340,17 +365,11 @@ namespace pages
         {
             LAST_SENSOR_UPDATE = millis();
 
-            // sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
-            // sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
-            // sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
-            // sensor_data.is_fire_on = true;
-            // sensor_data.is_water_sufficient = true;
-
-            sensor_data.water_temperature = 87.5;
-            sensor_data.air_temperature = 86.1;
-            sensor_data.humidity = 95.4;
-            sensor_data.is_fire_on = true;
-            sensor_data.is_water_sufficient = true;
+            sensor_data.water_temperature = sensor_manager::smoothed_thermocouple_temperature_celcius(0);
+            sensor_data.air_temperature = sensor_manager::sht3x_temperature_celcius();
+            sensor_data.humidity = sensor_manager::sht3x_humidity_percent();
+            sensor_data.is_fire_on = sensor_manager::is_fire_detected();
+            sensor_data.is_water_sufficient = sensor_manager::is_water_sufficient();
             sensor_data.setpoint = static_cast<int>(sensor_manager::get_setpoint_temperature());
 
             _outbound_sensor_data.water_temperature = sensor_data.water_temperature;
@@ -359,13 +378,6 @@ namespace pages
             _outbound_sensor_data.is_fire_on = sensor_data.water_temperature;
             _outbound_sensor_data.is_water_sufficient = sensor_data.water_temperature;
 
-            if (!is_steaming)
-            {
-                if (sensor_data.water_temperature >= sensor_data.setpoint)
-                {
-                    is_steaming = true;
-                }
-            }
             Serial.printf("[SENSOR] Thermocouple offset is: %f\n", sensor_manager::get_thermocouple_offset());
         }
 
@@ -402,49 +414,14 @@ namespace pages
 
             if (is_different)
             {
-                // network_manager::publish_actuator_data(actuator_data);
+                queue_manager::enqueue_actuator_data(_outbound_actuator_data);
             }
         }
 
         if (millis() - LAST_PUBLISH_SENSOR_DATA >= PUBLISH_SENSOR_DATA_INTERVAL_MS)
         {
             LAST_PUBLISH_SENSOR_DATA = millis();
-            // network_manager::publish_sensor_data(sensor_data);
             queue_manager::enqueue_sensor_data(_outbound_sensor_data);
-
-            // for data collecting
-            // network_manager::publish_actuator_data(actuator_data);
-            queue_manager::enqueue_actuator_data(_outbound_actuator_data);
-        }
-
-        if (millis() - LAST_CONTROL >= CONTROL_INTERVAL_MS)
-        {
-            LAST_CONTROL = millis();
-
-            // if (!is_steaming)
-            // {
-            //     actuator_manager::open_wide_valve();
-            // } else {
-            //     actuator_manager::open_narrow_valve();
-            // }
-            const float temp = sensor_data.water_temperature;
-            const float upper = sensor_data.setpoint + constant::UPPER_HYSTERESIS_BAND;
-            const float lower = sensor_data.setpoint - constant::LOWER_HYSTERESIS_BAND;
-
-            if (temp >= upper)
-            {
-                actuator_manager::open_narrow_valve();
-                actuator_manager::turn_on_pump();
-            }
-            else if (temp >= sensor_data.setpoint)
-            {
-                actuator_manager::open_narrow_valve();
-            }
-            else if (temp <= lower)
-            {
-                actuator_manager::turn_off_pump();
-                actuator_manager::open_wide_valve();
-            }
         }
     }
 
@@ -476,7 +453,7 @@ namespace pages
 
             tft.setTextFont(2);
             tft.setTextColor(t::kSage, t::kCardIdle);
-            tft.drawString(labelFor(field), cx, y + 18);
+            tft.drawString(labelFor(field), cx, y + 17);
         }
 
         // Value: the text padding paints over the previous value in the card
@@ -484,7 +461,7 @@ namespace pages
         tft.setTextFont(4);
         tft.setTextColor(valueColorFor(field, text), t::kCardIdle);
         tft.setTextPadding(w - 12);
-        tft.drawString(text, cx, y + 54);
+        tft.drawString(text, cx, y + 50);
         tft.setTextPadding(0);
     }
 
@@ -564,6 +541,99 @@ namespace pages
         default:
             return "";
         }
+    }
+
+    const char *SensorDashboardPage::stateName(StateMachine state)
+    {
+        switch (state)
+        {
+        case StateMachine::IDLE:
+            return "IDLE";
+        case StateMachine::PREPARATION:
+            return "PREPARATION";
+        case StateMachine::FILLING_WATER:
+            return "FILLING_WATER";
+        case StateMachine::FIRING:
+            return "FIRING";
+        case StateMachine::HEATING:
+            return "HEATING";
+        case StateMachine::STEAMING:
+            return "STEAMING";
+        case StateMachine::COMPLETED:
+            return "COMPLETED";
+        case StateMachine::FAILED:
+            return "FAILED";
+        case StateMachine::ERROR:
+            return "ERROR";
+        }
+        return "UNKNOWN";
+    }
+
+    void SensorDashboardPage::refreshState(TFT_eSPI &tft)
+    {
+        const StateMachine state = state_manager::get_state_machine();
+        if (static_cast<int>(state) != _last_state)
+        {
+            _last_state = static_cast<int>(state);
+            drawState(tft, state);
+        }
+    }
+
+    void SensorDashboardPage::drawState(TFT_eSPI &tft, StateMachine state)
+    {
+        // The pill color follows the phase of the run
+        uint16_t fill = t::kCardIdle;
+        uint16_t border = t::kLeafDark;
+        uint16_t text = t::kSage;
+
+        switch (state)
+        {
+        case StateMachine::PREPARATION:
+        case StateMachine::FILLING_WATER:
+            fill = t::kLeafDark;
+            border = t::kLeafMid;
+            text = t::kCream;
+            break;
+        case StateMachine::FIRING:
+        case StateMachine::HEATING:
+            fill = t::kOchre;
+            border = t::kOchre;
+            text = t::kBg;
+            break;
+        case StateMachine::STEAMING:
+            fill = kActive;
+            border = kActive;
+            text = t::kBg;
+            break;
+        case StateMachine::COMPLETED:
+            fill = t::kLeafMid;
+            border = t::kLeafMid;
+            text = t::kCream;
+            break;
+        case StateMachine::FAILED:
+        case StateMachine::ERROR:
+            fill = t::kBack;
+            border = t::kTerracotta;
+            text = t::kCream;
+            break;
+        default: // IDLE: neutral
+            break;
+        }
+
+        // The pill always covers the same rectangle, so a redraw fully
+        // replaces the previous state - no clearing needed.
+        const int cx = tft.width() / 2;
+        const int x = cx - kStateW / 2;
+        const int y = kStateY - kStateH / 2;
+
+        tft.fillRoundRect(x, y, kStateW, kStateH, kStateH / 2, fill);
+        tft.drawRoundRect(x, y, kStateW, kStateH, kStateH / 2, border);
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextSize(1);
+        tft.setTextFont(4);
+        tft.setTextColor(text, fill);
+        tft.drawString(stateName(state), cx, kStateY);
     }
 
     const char *SensorDashboardPage::buttonLabel(Button button)

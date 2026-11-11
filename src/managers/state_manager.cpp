@@ -7,6 +7,8 @@ namespace
 {
     static StateMachine _state_machine = StateMachine::IDLE;
 
+    static device_status_t device_status{};
+
     static bool is_running(StateMachine state)
     {
         switch (state)
@@ -68,6 +70,8 @@ namespace state_manager
             // always allowed (or add checking here)
             set_state_machine(StateMachine::COMPLETED);
             queue_manager::enqueue_command_event(cmd);
+            device_status = {.state_machine = get_state_machine()};
+            queue_manager::enqueue_device_status_data(device_status);
             return;
         }
 
@@ -83,6 +87,8 @@ namespace state_manager
         sensor_manager::set_setpoint_temperature((float)cmd.setpoint);
         sensor_manager::set_timer(cmd.timer_minutes);
         state_manager::set_state_machine(StateMachine::PREPARATION); // state changes NOW
+        device_status = {.state_machine = get_state_machine()};
+        queue_manager::enqueue_device_status_data(device_status);
         queue_manager::enqueue_command_event(cmd);
     }
 
