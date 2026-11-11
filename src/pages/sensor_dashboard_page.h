@@ -1,11 +1,13 @@
 #pragma once
 
 #include "i_page.h"
+#include "config/type.h"
 
 namespace pages
 {
-    // Read-only dashboard shown as a grid of stat cards (timer, temperatures,
-    // humidity, valve, pump, lighter), plus two buttons: a Lighter toggle
+    // Read-only dashboard: a state machine indicator under the title (shows
+    // the state's name, e.g. FILLING_WATER), a grid of stat cards (timer,
+    // temperatures, humidity, valve, pump, lighter), plus two buttons: a Lighter toggle
     // (its text switches between "Lighter ON" and "Lighter OFF") and Stop.
     // The encoder moves focus between the buttons and a click activates the
     // focused one. No edit mode is needed because none of the buttons has
@@ -38,6 +40,11 @@ namespace pages
             Count // not a real button - used only to size loops
         };
 
+        // State machine indicator: redrawn only when the state changes
+        void refreshState(TFT_eSPI &tft);
+        void drawState(TFT_eSPI &tft, StateMachine state);
+        static const char *stateName(StateMachine state);
+
         void drawStat(TFT_eSPI &tft, Field field, bool force);
         void formatValue(Field field, char *buffer, size_t bufferSize) const;
         static const char *labelFor(Field field);
@@ -49,6 +56,10 @@ namespace pages
 
         unsigned long _countdown_end_ms = 0;
         unsigned long _last_refresh_ms = 0;
+
+        // State machine value the indicator was last drawn with
+        // (-1 = nothing drawn yet)
+        int _last_state = -1;
 
         // Index of the focused Button. Defaults to Stop so a plain click on
         // entering the page behaves exactly like before.

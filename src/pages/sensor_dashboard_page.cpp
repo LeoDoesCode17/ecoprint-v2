@@ -20,16 +20,22 @@ namespace pages
     {
         // Layout (designed for 480x320) - theme and card style shared with
         // the other pages (see theme.h)
-        constexpr int kTitleY = 22;
-        constexpr int kDividerY = 44;
+        constexpr int kTitleY = 20;
         constexpr int kCardRadius = 12;
+
+        // State machine indicator: a pill in the band between the title and
+        // the grid, with a line running out to each side of it
+        constexpr int kStateY = 52; // vertical center of the pill
+        constexpr int kStateW = 240;
+        constexpr int kStateH = 30;
+        constexpr int kStateLineMargin = 24;
 
         // Stat cards: a kStatCols x kStatRows grid of read-only cards
         constexpr int kStatCols = 4;
         constexpr int kStatRows = 2;
         constexpr int kGridMarginX = 16;
-        constexpr int kGridTop = 58;
-        constexpr int kStatH = 84;
+        constexpr int kGridTop = 72;
+        constexpr int kStatH = 78;
         constexpr int kStatGap = 8;
 
         // Button row: [Lighter ON/OFF toggle] [Stop]
@@ -132,16 +138,23 @@ namespace pages
 
         tft.fillScreen(t::kBg);
 
-        // Title + divider (same style as the other pages)
+        // Title
         tft.setTextDatum(MC_DATUM);
         tft.setTextFont(4);
         tft.setTextSize(1);
         tft.setTextColor(t::kCream, t::kBg);
         tft.drawString("Sensor Dashboard", cx, kTitleY);
 
-        tft.drawFastHLine(cx - 70, kDividerY, 60, t::kSage);
-        tft.drawFastHLine(cx + 10, kDividerY, 60, t::kSage);
-        tft.fillCircle(cx, kDividerY, 3, t::kOchre);
+        // Lines on both sides of the state pill (the pill itself is drawn
+        // by refreshState())
+        const int lineGap = 10;
+        const int leftEnd = cx - kStateW / 2 - lineGap;
+        const int rightStart = cx + kStateW / 2 + lineGap;
+        tft.drawFastHLine(kStateLineMargin, kStateY, leftEnd - kStateLineMargin, t::kSage);
+        tft.drawFastHLine(rightStart, kStateY, tft.width() - kStateLineMargin - rightStart, t::kSage);
+
+        _last_state = -1;
+        refreshState(tft);
 
         for (int i = 0; i < static_cast<int>(Field::Count); i++)
         {
@@ -260,6 +273,9 @@ namespace pages
         default:
             break;
         }
+
+        // Show the (possibly just changed) state machine state
+        refreshState(tft);
 
         if (encoderDelta != 0)
         {
@@ -437,7 +453,7 @@ namespace pages
 
             tft.setTextFont(2);
             tft.setTextColor(t::kSage, t::kCardIdle);
-            tft.drawString(labelFor(field), cx, y + 18);
+            tft.drawString(labelFor(field), cx, y + 17);
         }
 
         // Value: the text padding paints over the previous value in the card
@@ -445,7 +461,7 @@ namespace pages
         tft.setTextFont(4);
         tft.setTextColor(valueColorFor(field, text), t::kCardIdle);
         tft.setTextPadding(w - 12);
-        tft.drawString(text, cx, y + 54);
+        tft.drawString(text, cx, y + 50);
         tft.setTextPadding(0);
     }
 
@@ -525,6 +541,99 @@ namespace pages
         default:
             return "";
         }
+    }
+
+    const char *SensorDashboardPage::stateName(StateMachine state)
+    {
+        switch (state)
+        {
+        case StateMachine::IDLE:
+            return "IDLE";
+        case StateMachine::PREPARATION:
+            return "PREPARATION";
+        case StateMachine::FILLING_WATER:
+            return "FILLING_WATER";
+        case StateMachine::FIRING:
+            return "FIRING";
+        case StateMachine::HEATING:
+            return "HEATING";
+        case StateMachine::STEAMING:
+            return "STEAMING";
+        case StateMachine::COMPLETED:
+            return "COMPLETED";
+        case StateMachine::FAILED:
+            return "FAILED";
+        case StateMachine::ERROR:
+            return "ERROR";
+        }
+        return "UNKNOWN";
+    }
+
+    void SensorDashboardPage::refreshState(TFT_eSPI &tft)
+    {
+        const StateMachine state = state_manager::get_state_machine();
+        if (static_cast<int>(state) != _last_state)
+        {
+            _last_state = static_cast<int>(state);
+            drawState(tft, state);
+        }
+    }
+
+    void SensorDashboardPage::drawState(TFT_eSPI &tft, StateMachine state)
+    {
+        // The pill color follows the phase of the run
+        uint16_t fill = t::kCardIdle;
+        uint16_t border = t::kLeafDark;
+        uint16_t text = t::kSage;
+
+        switch (state)
+        {
+        case StateMachine::PREPARATION:
+        case StateMachine::FILLING_WATER:
+            fill = t::kLeafDark;
+            border = t::kLeafMid;
+            text = t::kCream;
+            break;
+        case StateMachine::FIRING:
+        case StateMachine::HEATING:
+            fill = t::kOchre;
+            border = t::kOchre;
+            text = t::kBg;
+            break;
+        case StateMachine::STEAMING:
+            fill = kActive;
+            border = kActive;
+            text = t::kBg;
+            break;
+        case StateMachine::COMPLETED:
+            fill = t::kLeafMid;
+            border = t::kLeafMid;
+            text = t::kCream;
+            break;
+        case StateMachine::FAILED:
+        case StateMachine::ERROR:
+            fill = t::kBack;
+            border = t::kTerracotta;
+            text = t::kCream;
+            break;
+        default: // IDLE: neutral
+            break;
+        }
+
+        // The pill always covers the same rectangle, so a redraw fully
+        // replaces the previous state - no clearing needed.
+        const int cx = tft.width() / 2;
+        const int x = cx - kStateW / 2;
+        const int y = kStateY - kStateH / 2;
+
+        tft.fillRoundRect(x, y, kStateW, kStateH, kStateH / 2, fill);
+        tft.drawRoundRect(x, y, kStateW, kStateH, kStateH / 2, border);
+
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextSize(1);
+        tft.setTextFont(4);
+        tft.setTextColor(text, fill);
+        tft.drawString(stateName(state), cx, kStateY);
     }
 
     const char *SensorDashboardPage::buttonLabel(Button button)
